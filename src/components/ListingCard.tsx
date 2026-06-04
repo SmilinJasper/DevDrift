@@ -26,6 +26,8 @@ function formatDateRange(start: string | null, end: string | null) {
   return `${startDate} - ${endDate}`;
 }
 
+import { useEffect, useRef } from "react";
+
 export function ListingCard({
   listing,
   isSaved = false,
@@ -34,7 +36,38 @@ export function ListingCard({
   index = 0,
 }: ListingCardProps) {
   const style = typeStyles[listing.type];
-  
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let observer: IntersectionObserver;
+    let timeout: NodeJS.Timeout;
+
+    if (cardRef.current) {
+      observer = new IntersectionObserver(
+        (entries) => {
+          if (entries[0].isIntersecting) {
+            timeout = setTimeout(() => {
+              fetch("/api/interactions", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ listing_id: listing.id, kind: "view" }),
+              }).catch(() => {});
+            }, 1500); // 1.5 second threshold to prevent spam while scrolling fast
+          } else {
+            clearTimeout(timeout);
+          }
+        },
+        { threshold: 0.5 }
+      );
+      observer.observe(cardRef.current);
+    }
+
+    return () => {
+      clearTimeout(timeout);
+      if (observer) observer.disconnect();
+    };
+  }, [listing.id]);
+
   // Format score as percentage if provided
   const scoreBadge = "similarity" in listing && showScore ? (
     <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-dd-accent-glow text-dd-accent text-xs font-semibold">
@@ -45,6 +78,7 @@ export function ListingCard({
 
   return (
     <motion.div
+      ref={cardRef}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay: index * 0.05, ease: "easeOut" }}

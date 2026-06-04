@@ -99,15 +99,21 @@ function applyTimeDecay(
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
 
-  // ── 1. Parse & validate parameters ─────────────────────────────────────
+  // ── 1. Fetch authenticated user or fallback ─────────────────────────
+  
+  const supabase = await createSupabaseServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
 
-  const userId = searchParams.get("userId");
+  const userId = user?.id || searchParams.get("userId");
+
   if (!userId || !UUID_REGEX.test(userId)) {
     return Response.json(
       { error: "Missing or invalid 'userId' parameter. Must be a valid UUID." },
       { status: 400 }
     );
   }
+
+  // ── 2. Parse & validate parameters ─────────────────────────────────────
 
   const limitParam = searchParams.get("limit");
   let limit = DEFAULT_PAGE_SIZE;
@@ -169,8 +175,6 @@ export async function GET(request: NextRequest) {
   const rpcLimit = typeFilter ? limit * 3 : limit + 5;
 
   try {
-    const supabase = await createSupabaseServerClient();
-
     const { data: rpcResults, error: rpcError } = await supabase.rpc(
       "recommend_listings_for_user",
       {

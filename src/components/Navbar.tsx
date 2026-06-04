@@ -1,11 +1,13 @@
-"use client";
-
 import Link from "next/link";
-import { Compass, Menu, X } from "lucide-react";
-import { useState } from "react";
+import { Compass, User } from "lucide-react";
+import { NavbarClient } from "./NavbarClient";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-export function Navbar() {
-  const [isOpen, setIsOpen] = useState(false);
+export async function Navbar() {
+  const supabase = await createSupabaseServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  const isAuthenticated = !!user;
 
   return (
     <nav className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -37,42 +39,32 @@ export function Navbar() {
         </div>
 
         <div className="flex items-center gap-4">
-          <div className="hidden md:block">
-            {/* Dark mode is enforced for this phase */}
+          <div className="hidden md:flex items-center gap-4">
             <span className="text-xs font-semibold px-2 py-1 bg-muted rounded-md border text-muted-foreground">
               Dark Mode
             </span>
+            
+            {isAuthenticated ? (
+              <Link
+                href="/profile"
+                className="flex items-center gap-1.5 text-sm font-medium text-dd-accent hover:text-dd-accent/80 transition-colors px-3 py-1.5 rounded-full bg-dd-accent/10"
+              >
+                <User className="w-4 h-4" />
+                Profile
+              </Link>
+            ) : (
+              <Link
+                href="/login"
+                className="text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-1.5 rounded-full transition-colors"
+              >
+                Sign In
+              </Link>
+            )}
           </div>
 
-          <button
-            className="md:hidden p-2 text-foreground"
-            onClick={() => setIsOpen(!isOpen)}
-            aria-label="Toggle Menu"
-          >
-            {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-          </button>
+          <NavbarClient isAuthenticated={isAuthenticated} />
         </div>
       </div>
-
-      {/* Mobile Menu */}
-      {isOpen && (
-        <div className="md:hidden border-b border-border bg-background p-4 space-y-4">
-          <Link
-            href="/"
-            className="block text-sm font-medium hover:text-dd-accent transition-colors"
-            onClick={() => setIsOpen(false)}
-          >
-            Home Feed
-          </Link>
-          <Link
-            href="/discover"
-            className="block text-sm font-medium hover:text-dd-accent transition-colors"
-            onClick={() => setIsOpen(false)}
-          >
-            Discovery
-          </Link>
-        </div>
-      )}
     </nav>
   );
 }
