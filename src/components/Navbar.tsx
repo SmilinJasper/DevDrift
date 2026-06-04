@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Compass, User } from "lucide-react";
+import Image from "next/image";
+import { User } from "lucide-react";
 import { NavbarClient } from "./NavbarClient";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -14,8 +15,13 @@ export async function Navbar() {
       <div className="container mx-auto max-w-6xl px-4 h-16 flex items-center justify-between">
         <div className="flex items-center gap-6">
           <Link href="/" className="flex items-center gap-2 group">
-            <div className="bg-dd-gradient p-1.5 rounded-lg text-white shadow-[0_0_15px_var(--color-dd-accent-glow)] group-hover:shadow-[0_0_20px_var(--color-dd-accent-glow)] transition-shadow">
-              <Compass className="w-5 h-5" />
+            <div className="relative w-8 h-8 rounded-lg overflow-hidden shadow-[0_0_15px_var(--color-dd-accent-glow)] group-hover:shadow-[0_0_20px_var(--color-dd-accent-glow)] transition-shadow">
+              <Image 
+                src="/logo.png" 
+                alt="DevDrift Logo" 
+                fill 
+                className="object-cover"
+              />
             </div>
             <span className="font-bold text-xl tracking-tight hidden sm:inline-block">
               Dev<span className="text-dd-gradient">Drift</span>
