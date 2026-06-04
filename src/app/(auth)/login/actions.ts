@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export async function login(formData: FormData) {
@@ -46,17 +47,22 @@ export async function loginWithGoogle() {
   const supabase = await createSupabaseServerClient();
   
   // Dynamically resolve the site URL for Vercel deployments
-  const getSiteUrl = () => {
+  const getSiteUrl = async () => {
     if (process.env.NEXT_PUBLIC_SITE_URL) return process.env.NEXT_PUBLIC_SITE_URL;
     if (process.env.VERCEL_PROJECT_PRODUCTION_URL) return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
     if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
-    return 'http://localhost:3000';
+    
+    // Fully dynamic fallback using Next.js headers
+    const headersList = await headers();
+    const host = headersList.get("host");
+    const protocol = headersList.get("x-forwarded-proto") || "https";
+    return `${protocol}://${host}`;
   };
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      redirectTo: `${getSiteUrl()}/auth/callback`,
+      redirectTo: `${await getSiteUrl()}/auth/callback`,
     },
   });
 
