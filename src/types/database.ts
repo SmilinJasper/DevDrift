@@ -108,3 +108,25 @@ export interface RecommendationResponse {
     page_size: number;
   };
 }
+
+/** State for Discovery page filters */
+export interface DiscoveryFilters {
+  type: ListingType | "all";
+  location: "all" | "india" | "global";
+}
+
+/** Cursor state for keyset-based infinite pagination (Listings) */
+export interface ListingCursor {
+  popularity_score: number; // popularity_score of the last item
+  id: string; // UUID of the last item (tiebreaker)
+}
+
+/** Shape of the paginated API response from GET /api/listings */
+export interface ListingsResponse {
+  data: Listing[];
+  pagination: {
+    next_cursor: string | null; // Base64-encoded ListingCursor, null if no more
+    has_more: boolean;
+    page_size: number;
+  };
+}
