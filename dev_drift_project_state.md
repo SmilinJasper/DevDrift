@@ -41,7 +41,7 @@ Built with a dark-mode-first aesthetic (utilizing Tailwind CSS v4, Framer Motion
 - **Animations:** Framer Motion `^12.40.0` (smooth spring-physics transitions, tab transitions)
 - **Database:** Supabase PostgreSQL with `pgvector` (vector index support) and custom triggers
 - **Local Embedding Engine:** `@xenova/transformers` (`all-MiniLM-L6-v2` model running locally to create user/listing embeddings)
-- **Scraper (Orbit):** Python `3.11` + Playwright (for Devpost) + Apify SDK client (for Indeed and LinkedIn)
+- **Scraper (Orbit):** Python `3.11` + Playwright (for Devpost) + Apify SDK client (for Indeed and LinkedIn via `curious_coder/linkedin-jobs-scraper`)
 - **Scheduler:** GitHub Actions (configured to run on a 12-hour cron job)
 
 ### 2.2 System Architecture Diagram
@@ -264,7 +264,7 @@ Direct scraping of platforms (LinkedIn, Glassdoor, Indeed) using Playwright in c
   - Searches country inputs: `["US", "IN"]` (United States, India).
   - Search keywords: `"software intern"`, `"software"`.
   - Max items limit: `15` items per query to preserve free-tier credits.
-- **LinkedIn Scraper (`bebity/linkedin-jobs-scraper`):**
+- **LinkedIn Scraper (`curious_coder/linkedin-jobs-scraper`):**
   - Scrapes opportunities using pre-formed, time-sorted incognito search queries.
   - Search URL targets:
     - Keywords: "software" in India.
@@ -344,7 +344,7 @@ Add the following secrets to your GitHub Repository settings (`Settings > Secret
 ### 9.3 Apify Actor Setup
 Before running the scraping pipeline, add the following actors to your Apify account (free tier supports up to $5/month credits):
 1. **Indeed Scraper:** `borderline/indeed-scraper`
-2. **LinkedIn Jobs Scraper:** `bebity/linkedin-jobs-scraper`
+2. **LinkedIn Jobs Scraper:** `curious_coder/linkedin-jobs-scraper`
 
 ---
 

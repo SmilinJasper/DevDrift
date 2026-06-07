@@ -9,7 +9,7 @@ APIFY_API_TOKEN = os.getenv("APIFY_API_TOKEN")
 
 # Apify Actor IDs
 INDEED_ACTOR_ID = "borderline/indeed-scraper"
-LINKEDIN_ACTOR_ID = "bebity/linkedin-jobs-scraper"
+LINKEDIN_ACTOR_ID = "curious_coder/linkedin-jobs-scraper"
 
 # Search Configuration — tuned for free-tier credit conservation
 # Each keyword becomes a separate actor run, so keep the list short.
