@@ -11,6 +11,7 @@ from scraper.normalizer import (
     normalize_hackathon,
     normalize_indeed_job,
     normalize_linkedin_job,
+    normalize_wwr_job,
 )
 from scraper.db import get_supabase_client, get_system_crawler_profile_id, sync_listings
 
@@ -54,6 +55,8 @@ def main():
             normalized = normalize_indeed_job(raw)
         elif source == "linkedin":
             normalized = normalize_linkedin_job(raw)
+        elif source == "weworkremotely":
+            normalized = normalize_wwr_job(raw)
         else:
             print(f"  WARNING: Unknown source '{source}', skipping item.")
 

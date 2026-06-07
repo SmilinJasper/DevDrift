@@ -39,6 +39,18 @@ def _safe_truncate(text: str, max_len: int = 200) -> str:
     return text.strip()[:max_len]
 
 
+def _extract_location(loc_val) -> str:
+    """Helper to extract location string from raw value (dict or string)."""
+    if not loc_val:
+        return ""
+    if isinstance(loc_val, dict):
+        return (loc_val.get("formattedAddressLong") or 
+                loc_val.get("fullAddress") or 
+                loc_val.get("city") or 
+                loc_val.get("country") or "").strip()
+    return str(loc_val).strip()
+
+
 def _parse_iso_date(date_str):
     """Parses a date string into ISO 8601 format, returns None on failure."""
     if not date_str:
@@ -225,7 +237,7 @@ def normalize_indeed_job(raw: dict) -> dict | None:
     description = strip_html(raw.get("descriptionHtml", "") or raw.get("descriptionText", ""))
 
     # Location & remote detection
-    location = (raw.get("location") or "").strip()
+    location = _extract_location(raw.get("location"))
     is_remote = False
     if not location or "remote" in location.lower():
         is_remote = True
@@ -300,7 +312,7 @@ def normalize_linkedin_job(raw: dict) -> dict | None:
     description = strip_html(raw.get("descriptionHtml", "") or raw.get("descriptionText", ""))
 
     # Location & remote detection
-    location = (raw.get("location") or "").strip()
+    location = _extract_location(raw.get("location"))
     is_remote = False
     if not location or "remote" in location.lower():
         is_remote = True
@@ -346,3 +358,52 @@ def normalize_linkedin_job(raw: dict) -> dict | None:
         "popularity_score": 0.0,
         "is_published": True,
     }
+
+
+# ── WeWorkRemotely Normalizer ────────────────────────────────────────────────
+
+def normalize_wwr_job(raw: dict) -> dict | None:
+    """
+    Maps raw WeWorkRemotely RSS output to the Supabase listings schema.
+    """
+    title = _safe_truncate(raw.get("title", ""), 200)
+    if not title:
+        return None
+        
+    description = strip_html(raw.get("description", ""))
+    application_url = raw.get("link", "")
+    
+    # WWR titles are often "Company Name: Job Title"
+    if ":" in title:
+        parts = title.split(":", 1)
+        company = parts[0].strip()
+        job_title = parts[1].strip()
+        title = _safe_truncate(f"{job_title} at {company}", 200)
+
+    starts_at = _parse_iso_date(raw.get("pubDate"))
+    listing_type = _detect_listing_type(title, description)
+
+    tags: list[str] = ["WeWorkRemotely"]
+    category = raw.get("category", "").strip()
+    if category:
+        tags.append(category)
+
+    if listing_type == "internship" and "Internship" not in tags:
+        tags.append("Internship")
+    elif listing_type == "job" and "Software" not in " ".join(tags):
+        tags.append("Software Engineering")
+
+    return {
+        "title": title,
+        "description": description,
+        "type": listing_type,
+        "tags": list(set(tags)),
+        "location": "Remote",
+        "is_remote": True,
+        "starts_at": starts_at,
+        "ends_at": None,
+        "application_url": application_url,
+        "popularity_score": 0.0,
+        "is_published": True,
+    }
+

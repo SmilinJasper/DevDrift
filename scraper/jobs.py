@@ -10,6 +10,7 @@ Results are returned as raw dicts with a `_source` key ('indeed' or
 """
 
 from scraper.apify import scrape_indeed, scrape_linkedin
+from scraper.weworkremotely import scrape_weworkremotely
 
 
 def scrape_jobs() -> list[dict]:
@@ -23,22 +24,28 @@ def scrape_jobs() -> list[dict]:
     print("  Scraping LinkedIn via Apify actor...")
     linkedin_results = scrape_linkedin()
 
+    print("  Scraping WeWorkRemotely RSS feed...")
+    wwr_results = scrape_weworkremotely()
+
     # Combine and do a final cross-source de-duplication by title+company
     combined: list[dict] = []
     seen_keys: set[str] = set()
 
-    for item in indeed_results + linkedin_results:
+    for item in indeed_results + linkedin_results + wwr_results:
         # Build a de-dup key from normalized title + company
         source = item.get("_source", "unknown")
         if source == "indeed":
-            title = (item.get("positionName") or "").strip().lower()
-            company = (item.get("company") or "").strip().lower()
-        else:  # linkedin
             title = (item.get("title") or "").strip().lower()
-            company = (item.get("company") or "").strip().lower()
+            company = (item.get("companyName") or "").strip().lower()
+        elif source == "linkedin":
+            title = (item.get("title") or "").strip().lower()
+            company = (item.get("companyName") or "").strip().lower()
+        else: # weworkremotely
+            title = (item.get("title") or "").strip().lower()
+            company = "" # WWR title contains company, so deduplication by title is sufficient
 
         dedup_key = f"{title}|{company}"
-        if dedup_key and dedup_key not in seen_keys:
+        if dedup_key and dedup_key != "|" and dedup_key not in seen_keys:
             seen_keys.add(dedup_key)
             combined.append(item)
 
