@@ -13,7 +13,7 @@ from scraper.config import (
     INDEED_ACTOR_ID,
     LINKEDIN_ACTOR_ID,
     SEARCH_KEYWORDS,
-    INDEED_COUNTRY,
+    INDEED_COUNTRIES,
     INDEED_MAX_ITEMS,
     LINKEDIN_SEARCH_URLS,
     LINKEDIN_MAX_ITEMS,
@@ -35,33 +35,34 @@ def _get_client() -> ApifyClient:
 
 def scrape_indeed() -> list[dict]:
     """
-    Runs the Indeed Scraper actor for each keyword and collects results.
+    Runs the Indeed Scraper actor for each keyword × country combination.
     Returns a list of raw dicts tagged with source='indeed'.
     """
     client = _get_client()
     all_results: list[dict] = []
 
-    for keyword in SEARCH_KEYWORDS:
-        print(f"  [Indeed] Running actor for keyword: '{keyword}'...")
-        run_input = {
-            "position": keyword,
-            "country": INDEED_COUNTRY,
-            "maxItemsPerSearch": INDEED_MAX_ITEMS,
-        }
+    for country in INDEED_COUNTRIES:
+        for keyword in SEARCH_KEYWORDS:
+            print(f"  [Indeed] Running actor for '{keyword}' in {country}...")
+            run_input = {
+                "position": keyword,
+                "country": country,
+                "maxItemsPerSearch": INDEED_MAX_ITEMS,
+            }
 
-        try:
-            run = client.actor(INDEED_ACTOR_ID).call(run_input=run_input)
-            dataset_items = list(
-                client.dataset(run["defaultDatasetId"]).iterate_items()
-            )
-            print(f"  [Indeed] Got {len(dataset_items)} results for '{keyword}'.")
+            try:
+                run = client.actor(INDEED_ACTOR_ID).call(run_input=run_input)
+                dataset_items = list(
+                    client.dataset(run["defaultDatasetId"]).iterate_items()
+                )
+                print(f"  [Indeed] Got {len(dataset_items)} results for '{keyword}' in {country}.")
 
-            for item in dataset_items:
-                item["_source"] = "indeed"
-            all_results.extend(dataset_items)
+                for item in dataset_items:
+                    item["_source"] = "indeed"
+                all_results.extend(dataset_items)
 
-        except Exception as e:
-            print(f"  [Indeed] ERROR for keyword '{keyword}': {e}")
+            except Exception as e:
+                print(f"  [Indeed] ERROR for '{keyword}' in {country}: {e}")
 
     # De-duplicate by URL within Indeed results
     seen_urls: set[str] = set()
