@@ -68,7 +68,7 @@ def scrape_indeed() -> list[dict]:
     seen_urls: set[str] = set()
     unique: list[dict] = []
     for item in all_results:
-        url = item.get("url") or item.get("externalApplyLink") or ""
+        url = item.get("applyUrl") or item.get("jobUrl") or ""
         if url and url not in seen_urls:
             seen_urls.add(url)
             unique.append(item)
@@ -110,7 +110,7 @@ def scrape_linkedin() -> list[dict]:
         seen_urls: set[str] = set()
         unique: list[dict] = []
         for item in dataset_items:
-            url = item.get("jobUrl") or ""
+            url = item.get("applyUrl") or item.get("link") or ""
             if url and url not in seen_urls:
                 seen_urls.add(url)
                 unique.append(item)

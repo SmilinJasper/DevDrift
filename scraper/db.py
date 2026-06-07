@@ -80,20 +80,20 @@ def get_system_crawler_profile_id(supabase: Client) -> str:
             
         raise RuntimeError(f"Could not initialize system crawler profile. Constraint check failed: {e}")
 
-def get_existing_listings_map(supabase: Client) -> dict:
-    """Returns a dictionary mapping application_url -> listing_id of existing database listings."""
+def sync_listings(supabase: Client, normalized_listings: list, crawler_profile_id: str):
+    """Upserts normalized listings to Supabase and deletes old listings not present in this run."""
     try:
         res = supabase.table("listings").select("id, application_url").execute()
-        return {item["application_url"]: item["id"] for item in res.data if item.get("application_url")}
+        existing_map = {item["application_url"]: item["id"] for item in res.data if item.get("application_url")}
+        all_existing_ids = {item["id"] for item in res.data}
     except Exception as e:
         print(f"Warning: Could not fetch existing listings map: {e}")
-        return {}
+        existing_map = {}
+        all_existing_ids = set()
 
-def sync_listings(supabase: Client, normalized_listings: list, crawler_profile_id: str):
-    """Upserts normalized listings to Supabase, preventing duplicate insertions by application_url."""
-    existing_map = get_existing_listings_map(supabase)
-    print(f"Found {len(existing_map)} existing listings in database.")
+    print(f"Found {len(all_existing_ids)} existing listings in database.")
     
+    kept_ids = set()
     inserted_count = 0
     updated_count = 0
     
@@ -102,20 +102,39 @@ def sync_listings(supabase: Client, normalized_listings: list, crawler_profile_i
         item["created_by"] = crawler_profile_id
         
         url = item.get("application_url")
-        if url in existing_map:
+        if url and url in existing_map:
             # Update existing listing
             listing_id = existing_map[url]
             try:
                 supabase.table("listings").update(item).eq("id", listing_id).execute()
+                kept_ids.add(listing_id)
                 updated_count += 1
             except Exception as e:
                 print(f"Error updating listing '{item.get('title')}': {e}")
         else:
             # Insert new listing
             try:
-                supabase.table("listings").insert(item).execute()
+                res_insert = supabase.table("listings").insert(item).execute()
+                if res_insert.data:
+                    kept_ids.add(res_insert.data[0]["id"])
                 inserted_count += 1
             except Exception as e:
                 print(f"Error inserting listing '{item.get('title')}': {e}")
                 
-    print(f"Sync complete: Inserted {inserted_count} new listings, updated {updated_count} existing listings.")
+    # Delete listings that are no longer present
+    ids_to_delete = all_existing_ids - kept_ids
+    deleted_count = 0
+    if ids_to_delete:
+        print(f"Deleting {len(ids_to_delete)} old listings...")
+        ids_list = list(ids_to_delete)
+        # Delete in batches of 50
+        batch_size = 50
+        for i in range(0, len(ids_list), batch_size):
+            batch = ids_list[i:i+batch_size]
+            try:
+                supabase.table("listings").delete().in_("id", batch).execute()
+                deleted_count += len(batch)
+            except Exception as e:
+                print(f"Error deleting batch of old listings: {e}")
+                
+    print(f"Sync complete: Inserted {inserted_count}, updated {updated_count}, deleted {deleted_count} old listings.")

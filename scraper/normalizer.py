@@ -206,23 +206,23 @@ def normalize_indeed_job(raw: dict) -> dict | None:
     Maps raw Indeed actor output to the Supabase listings schema.
 
     Indeed fields → Schema fields:
-      positionName  → title (with company appended)
-      company       → used in title
+      title         → title (with company appended)
+      companyName   → used in title
       location      → location + remote detection
-      url / externalApplyLink → application_url
-      description   → description (HTML stripped)
+      applyUrl / jobUrl → application_url
+      descriptionHtml / descriptionText → description (HTML stripped)
       jobType       → tags
       salary        → tags (if present)
     """
-    title = _safe_truncate(raw.get("positionName", ""), 200)
+    title = _safe_truncate(raw.get("title", ""), 200)
     if not title:
         return None
 
-    company = (raw.get("company") or "").strip()
+    company = (raw.get("companyName") or "").strip()
     if company and company.lower() not in title.lower():
         title = _safe_truncate(f"{title} at {company}", 200)
 
-    description = strip_html(raw.get("description", ""))
+    description = strip_html(raw.get("descriptionHtml", "") or raw.get("descriptionText", ""))
 
     # Location & remote detection
     location = (raw.get("location") or "").strip()
@@ -233,7 +233,7 @@ def normalize_indeed_job(raw: dict) -> dict | None:
             location = "Remote"
 
     # Application URL — prefer the direct employer link
-    application_url = raw.get("externalApplyLink") or raw.get("url") or ""
+    application_url = raw.get("applyUrl") or raw.get("jobUrl") or ""
 
     # Auto-detect listing type from title + description
     listing_type = _detect_listing_type(title, description)
@@ -281,11 +281,11 @@ def normalize_linkedin_job(raw: dict) -> dict | None:
 
     LinkedIn fields → Schema fields:
       title            → title (with company appended)
-      company          → used in title
+      companyName      → used in title
       location         → location + remote detection
-      jobUrl           → application_url
+      applyUrl / link  → application_url
       postedAt         → starts_at (posted date)
-      description      → description
+      descriptionHtml  → description
       employmentType   → tags
       seniorityLevel   → tags
     """
@@ -293,11 +293,11 @@ def normalize_linkedin_job(raw: dict) -> dict | None:
     if not title:
         return None
 
-    company = (raw.get("company") or "").strip()
+    company = (raw.get("companyName") or "").strip()
     if company and company.lower() not in title.lower():
         title = _safe_truncate(f"{title} at {company}", 200)
 
-    description = strip_html(raw.get("description", ""))
+    description = strip_html(raw.get("descriptionHtml", "") or raw.get("descriptionText", ""))
 
     # Location & remote detection
     location = (raw.get("location") or "").strip()
@@ -308,7 +308,7 @@ def normalize_linkedin_job(raw: dict) -> dict | None:
             location = "Remote"
 
     # Application URL
-    application_url = raw.get("jobUrl") or ""
+    application_url = raw.get("applyUrl") or raw.get("link") or ""
 
     # Posted date → starts_at
     starts_at = _parse_iso_date(raw.get("postedAt"))
