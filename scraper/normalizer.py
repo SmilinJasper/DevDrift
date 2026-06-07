@@ -51,6 +51,31 @@ def _extract_location(loc_val) -> str:
     return str(loc_val).strip()
 
 
+def _extract_salary(salary_val) -> str:
+    """Helper to extract salary string from raw value (dict or string)."""
+    if not salary_val:
+        return ""
+    if isinstance(salary_val, dict):
+        currency = salary_val.get("salaryCurrency") or ""
+        min_val = salary_val.get("salaryMin")
+        max_val = salary_val.get("salaryMax")
+        formatted = salary_val.get("formatted") or salary_val.get("salaryText") or salary_val.get("text")
+        
+        if formatted:
+            return str(formatted).strip()
+        elif min_val is not None and max_val is not None:
+            if min_val == max_val:
+                return f"{currency} {min_val}".strip()
+            return f"{currency} {min_val} - {max_val}".strip()
+        elif min_val is not None:
+            return f"{currency} {min_val}+".strip()
+        elif max_val is not None:
+            return f"Up to {currency} {max_val}".strip()
+        return ""
+    return str(salary_val).strip()
+
+
+
 def _parse_iso_date(date_str):
     """Parses a date string into ISO 8601 format, returns None on failure."""
     if not date_str:
@@ -258,7 +283,7 @@ def normalize_indeed_job(raw: dict) -> dict | None:
     elif isinstance(job_types, str):
         tags.append(job_types.strip())
 
-    salary = (raw.get("salary") or "").strip()
+    salary = _extract_salary(raw.get("salary"))
     if salary:
         tags.append(salary)
 
