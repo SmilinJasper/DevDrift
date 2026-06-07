@@ -26,6 +26,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r scraper/requirements.txt
 
+      # Playwright is still needed for the Devpost hackathon scraper
       - name: Install Playwright Chromium & OS Dependencies
         run: |
           playwright install --with-deps chromium
@@ -34,5 +35,6 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          APIFY_API_TOKEN: ${{ secrets.APIFY_API_TOKEN }}
         run: |
           python scraper/main.py

@@ -4,12 +4,37 @@ import os
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 
-# Scraper Targets
+# Apify API Configuration
+APIFY_API_TOKEN = os.getenv("APIFY_API_TOKEN")
+
+# Apify Actor IDs
+INDEED_ACTOR_ID = "misceres/indeed-scraper"
+LINKEDIN_ACTOR_ID = "bebity/linkedin-jobs-scraper"
+
+# Search Configuration — tuned for free-tier credit conservation
+# Each keyword becomes a separate actor run, so keep the list short.
+SEARCH_KEYWORDS = [
+    "software engineer intern",
+    "software developer intern",
+    "software engineering internship",
+    "junior software developer",
+]
+
+# Indeed-specific settings
+INDEED_COUNTRY = "US"
+INDEED_MAX_ITEMS = 20  # per keyword — keeps credit usage low on the free tier
+
+# LinkedIn search URLs — pre-built from linkedin.com/jobs/search in incognito
+# These target entry-level / internship software roles
+LINKEDIN_SEARCH_URLS = [
+    "https://www.linkedin.com/jobs/search/?keywords=software%20engineer%20intern&f_E=1%2C2&sortBy=DD",
+    "https://www.linkedin.com/jobs/search/?keywords=software%20developer%20internship&f_E=1%2C2&sortBy=DD",
+]
+LINKEDIN_MAX_ITEMS = 25  # total across all URLs — keeps credit usage low
+
+# Devpost Scraper Targets (unchanged — still uses Playwright)
 DEVPOST_BASE_URL = "https://devpost.com/hackathons"
 DEVPOST_INDIA_URL = "https://devpost.com/hackathons?search=India"
-
-WWR_RSS_URL = "https://weworkremotely.com/categories/remote-programming-jobs.rss"
-ARBEITNOW_API_URL = "https://www.arbeitnow.com/api/job-board-api"
 
 # System Crawler Profile settings
 SYSTEM_CRAWLER_EMAIL = "crawler@devdrift.com"

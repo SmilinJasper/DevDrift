@@ -3,6 +3,10 @@ from datetime import datetime
 from bs4 import BeautifulSoup
 from dateutil import parser as date_parser
 
+# Regex for detecting internship-related keywords in titles/descriptions
+_INTERN_RE = re.compile(r'\b(intern|internship|co-op|coop)\b', re.IGNORECASE)
+
+
 def strip_html(html_content):
     """Strips HTML tags and returns clean plaintext."""
     if not html_content:
@@ -14,6 +18,40 @@ def strip_html(html_content):
         # Fallback to regex if BeautifulSoup fails
         clean = re.compile('<.*?>')
         return re.sub(clean, '', html_content).strip()
+
+
+def _detect_listing_type(title: str, description: str = "") -> str:
+    """
+    Auto-detects whether a listing is a 'job' or 'internship'
+    based on keyword analysis of the title and description.
+    Maps to the public.listing_type enum: hackathon | job | internship
+    """
+    text = f"{title} {description}".lower()
+    if _INTERN_RE.search(text):
+        return "internship"
+    return "job"
+
+
+def _safe_truncate(text: str, max_len: int = 200) -> str:
+    """Safely truncates a string to max_len characters."""
+    if not text:
+        return ""
+    return text.strip()[:max_len]
+
+
+def _parse_iso_date(date_str):
+    """Parses a date string into ISO 8601 format, returns None on failure."""
+    if not date_str:
+        return None
+    try:
+        dt = date_parser.parse(str(date_str))
+        return dt.isoformat()
+    except Exception:
+        return None
+
+
+# ── Devpost Hackathon Normalizer (unchanged) ──────────────────────────────────
+
 
 def parse_devpost_dates(date_str):
     """
@@ -67,6 +105,7 @@ def parse_devpost_dates(date_str):
         print(f"Error parsing date string '{date_str}': {e}")
         return None, None
 
+
 def normalize_hackathon(raw):
     """Normalizes raw Devpost hackathon data into the listings schema."""
     title = raw.get("title", "").strip()[:200]
@@ -113,6 +152,10 @@ def normalize_hackathon(raw):
         "is_published": True
     }
 
+
+# ── Legacy Job Normalizer (kept for backward compatibility) ───────────────────
+
+
 def normalize_job(raw):
     """Normalizes raw job board internship data into the listings schema."""
     title = raw.get("title", "").strip()[:200]
@@ -152,4 +195,154 @@ def normalize_job(raw):
         "application_url": raw.get("url"),
         "popularity_score": 0.0,
         "is_published": True
+    }
+
+
+# ── Indeed Normalizer ─────────────────────────────────────────────────────────
+
+
+def normalize_indeed_job(raw: dict) -> dict | None:
+    """
+    Maps raw Indeed actor output to the Supabase listings schema.
+
+    Indeed fields → Schema fields:
+      positionName  → title (with company appended)
+      company       → used in title
+      location      → location + remote detection
+      url / externalApplyLink → application_url
+      description   → description (HTML stripped)
+      jobType       → tags
+      salary        → tags (if present)
+    """
+    title = _safe_truncate(raw.get("positionName", ""), 200)
+    if not title:
+        return None
+
+    company = (raw.get("company") or "").strip()
+    if company and company.lower() not in title.lower():
+        title = _safe_truncate(f"{title} at {company}", 200)
+
+    description = strip_html(raw.get("description", ""))
+
+    # Location & remote detection
+    location = (raw.get("location") or "").strip()
+    is_remote = False
+    if not location or "remote" in location.lower():
+        is_remote = True
+        if not location:
+            location = "Remote"
+
+    # Application URL — prefer the direct employer link
+    application_url = raw.get("externalApplyLink") or raw.get("url") or ""
+
+    # Auto-detect listing type from title + description
+    listing_type = _detect_listing_type(title, description)
+
+    # Build tags
+    tags: list[str] = []
+    job_types = raw.get("jobType") or []
+    if isinstance(job_types, list):
+        tags.extend([jt.strip() for jt in job_types if jt and jt.strip()])
+    elif isinstance(job_types, str):
+        tags.append(job_types.strip())
+
+    salary = (raw.get("salary") or "").strip()
+    if salary:
+        tags.append(salary)
+
+    # Add source and type tags
+    tags.append("Indeed")
+    if listing_type == "internship" and "Internship" not in tags:
+        tags.append("Internship")
+    elif listing_type == "job" and "Software" not in " ".join(tags):
+        tags.append("Software Engineering")
+
+    return {
+        "title": title,
+        "description": description,
+        "type": listing_type,
+        "tags": list(set(tags)),
+        "location": location,
+        "is_remote": is_remote,
+        "starts_at": None,
+        "ends_at": None,
+        "application_url": application_url,
+        "popularity_score": 0.0,
+        "is_published": True,
+    }
+
+
+# ── LinkedIn Normalizer ──────────────────────────────────────────────────────
+
+
+def normalize_linkedin_job(raw: dict) -> dict | None:
+    """
+    Maps raw LinkedIn Jobs Scraper actor output to the Supabase listings schema.
+
+    LinkedIn fields → Schema fields:
+      title            → title (with company appended)
+      company          → used in title
+      location         → location + remote detection
+      jobUrl           → application_url
+      postedAt         → starts_at (posted date)
+      description      → description
+      employmentType   → tags
+      seniorityLevel   → tags
+    """
+    title = _safe_truncate(raw.get("title", ""), 200)
+    if not title:
+        return None
+
+    company = (raw.get("company") or "").strip()
+    if company and company.lower() not in title.lower():
+        title = _safe_truncate(f"{title} at {company}", 200)
+
+    description = strip_html(raw.get("description", ""))
+
+    # Location & remote detection
+    location = (raw.get("location") or "").strip()
+    is_remote = False
+    if not location or "remote" in location.lower():
+        is_remote = True
+        if not location:
+            location = "Remote"
+
+    # Application URL
+    application_url = raw.get("jobUrl") or ""
+
+    # Posted date → starts_at
+    starts_at = _parse_iso_date(raw.get("postedAt"))
+
+    # Auto-detect listing type from title + description
+    listing_type = _detect_listing_type(title, description)
+
+    # Build tags
+    tags: list[str] = []
+    employment_type = (raw.get("employmentType") or "").strip()
+    if employment_type:
+        tags.append(employment_type)
+
+    seniority = (raw.get("seniorityLevel") or "").strip()
+    if seniority:
+        tags.append(seniority)
+
+    # Add source and type tags
+    tags.append("LinkedIn")
+    if listing_type == "internship" and "Internship" not in tags:
+        tags.append("Internship")
+    elif listing_type == "job" and "Software" not in " ".join(tags):
+        tags.append("Software Engineering")
+
+    return {
+        "title": title,
+        "description": description,
+        "type": listing_type,
+        "tags": list(set(tags)),
+        "location": location,
+        "is_remote": is_remote,
+        "starts_at": starts_at,
+        "ends_at": None,
+        "application_url": application_url,
+        "popularity_score": 0.0,
+        "is_published": True,
     }

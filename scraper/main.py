@@ -7,7 +7,11 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from scraper.devpost import scrape_devpost
 from scraper.jobs import scrape_jobs
-from scraper.normalizer import normalize_hackathon, normalize_job
+from scraper.normalizer import (
+    normalize_hackathon,
+    normalize_indeed_job,
+    normalize_linkedin_job,
+)
 from scraper.db import get_supabase_client, get_system_crawler_profile_id, sync_listings
 
 def parse_args():
@@ -38,15 +42,28 @@ def main():
             normalized_hackathons.append(normalized)
     print(f"Normalized {len(normalized_hackathons)} hackathons.")
     
-    # 2. Scrape Jobs & Internships
-    print("\n--- Phase 2: Scraping Internships from Job Boards ---")
+    # 2. Scrape Jobs & Internships via Apify (Indeed + LinkedIn)
+    print("\n--- Phase 2: Scraping Jobs & Internships via Apify ---")
     raw_jobs = scrape_jobs()
     normalized_jobs = []
     for raw in raw_jobs:
-        normalized = normalize_job(raw)
+        source = raw.get("_source", "unknown")
+        normalized = None
+
+        if source == "indeed":
+            normalized = normalize_indeed_job(raw)
+        elif source == "linkedin":
+            normalized = normalize_linkedin_job(raw)
+        else:
+            print(f"  WARNING: Unknown source '{source}', skipping item.")
+
         if normalized:
             normalized_jobs.append(normalized)
-    print(f"Normalized {len(normalized_jobs)} internship listings.")
+
+    # Count by type for reporting
+    job_count = sum(1 for j in normalized_jobs if j["type"] == "job")
+    intern_count = sum(1 for j in normalized_jobs if j["type"] == "internship")
+    print(f"Normalized {len(normalized_jobs)} listings ({job_count} jobs, {intern_count} internships).")
     
     # Combine listings
     all_listings = normalized_hackathons + normalized_jobs
@@ -61,7 +78,8 @@ def main():
             print(f"   Dates: {item['starts_at']} to {item['ends_at']}")
             print(f"   URL: {item['application_url']}")
             print(f"   Tags: {item['tags']}")
-            print(f"   Description Snippet: {item['description'][:200]}...")
+            desc_snippet = (item.get('description') or '')[:200]
+            print(f"   Description Snippet: {desc_snippet}...")
             
     # 4. Write to Supabase (if not dry-run)
     if not args.dry_run:
