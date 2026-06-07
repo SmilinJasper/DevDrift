@@ -45,15 +45,15 @@ def scrape_indeed() -> list[dict]:
         for keyword in SEARCH_KEYWORDS:
             print(f"  [Indeed] Running actor for '{keyword}' in {country}...")
             run_input = {
-                "position": keyword,
+                "query": keyword,
                 "country": country,
-                "maxItemsPerSearch": INDEED_MAX_ITEMS,
+                "maxRows": INDEED_MAX_ITEMS,
             }
 
             try:
                 run = client.actor(INDEED_ACTOR_ID).call(run_input=run_input)
                 dataset_items = list(
-                    client.dataset(run["defaultDatasetId"]).iterate_items()
+                    client.dataset(run.default_dataset_id).iterate_items()
                 )
                 print(f"  [Indeed] Got {len(dataset_items)} results for '{keyword}' in {country}.")
 
@@ -99,7 +99,7 @@ def scrape_linkedin() -> list[dict]:
     try:
         run = client.actor(LINKEDIN_ACTOR_ID).call(run_input=run_input)
         dataset_items = list(
-            client.dataset(run["defaultDatasetId"]).iterate_items()
+            client.dataset(run.default_dataset_id).iterate_items()
         )
         print(f"  [LinkedIn] Got {len(dataset_items)} results.")
 

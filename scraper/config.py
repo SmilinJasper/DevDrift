@@ -19,7 +19,7 @@ SEARCH_KEYWORDS = [
 ]
 
 # Indeed-specific settings
-INDEED_COUNTRIES = ["US", "IN"]  # Search in United States and India
+INDEED_COUNTRIES = ["us", "in"]  # Search in United States and India
 INDEED_MAX_ITEMS = 15  # per keyword per country — keeps credit usage low on the free tier
 
 # LinkedIn search URLs — pre-built from linkedin.com/jobs/search in incognito

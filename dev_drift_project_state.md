@@ -261,7 +261,7 @@ Direct scraping of platforms (LinkedIn, Glassdoor, Indeed) using Playwright in c
   - Stage 2: Jobs/Internships scraping (executes Indeed/LinkedIn Apify actors, normalizes schema, runs deduplication).
   - Stage 3: Syncs outputs into Supabase using a Service Role client.
 - **Indeed Scraper (`borderline/indeed-scraper`):** 
-  - Searches country inputs: `["US", "IN"]` (United States, India).
+  - Searches country inputs: `["us", "in"]` (United States, India).
   - Search keywords: `"software intern"`, `"software"`.
   - Max items limit: `15` items per query to preserve free-tier credits.
 - **LinkedIn Scraper (`curious_coder/linkedin-jobs-scraper`):**
