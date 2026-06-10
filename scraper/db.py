@@ -83,9 +83,30 @@ def get_system_crawler_profile_id(supabase: Client) -> str:
 def sync_listings(supabase: Client, normalized_listings: list, crawler_profile_id: str):
     """Upserts normalized listings to Supabase and deletes old listings not present in this run."""
     try:
-        res = supabase.table("listings").select("id, application_url").execute()
-        existing_map = {item["application_url"]: item["id"] for item in res.data if item.get("application_url")}
-        all_existing_ids = {item["id"] for item in res.data}
+        existing_map = {}
+        all_existing_ids = set()
+        
+        # Paginate to overcome Supabase's default 1000 row limit
+        page_size = 1000
+        start = 0
+        while True:
+            end = start + page_size - 1
+            res = supabase.table("listings").select("id, application_url").range(start, end).execute()
+            data = res.data
+            
+            if not data:
+                break
+                
+            for item in data:
+                if item.get("application_url"):
+                    existing_map[item["application_url"]] = item["id"]
+                all_existing_ids.add(item["id"])
+                
+            if len(data) < page_size:
+                break
+                
+            start += page_size
+            
     except Exception as e:
         print(f"Warning: Could not fetch existing listings map: {e}")
         existing_map = {}
