@@ -7,17 +7,18 @@ import type {
   RecommendationResponse,
   ListingType,
 } from "@/types/database";
+import {
+  MAX_PAGE_SIZE,
+  DEFAULT_PAGE_SIZE,
+  UUID_REGEX,
+  encodeCursor,
+  decodeCursor,
+} from "@/lib/utils/pagination";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
 /** Exponential decay rate. λ = 0.01 → half-life ≈ 69 days (gentle decay). */
 const DECAY_LAMBDA = 0.01;
-
-/** Maximum page size to prevent abuse. */
-const MAX_PAGE_SIZE = 50;
-
-/** Default page size. */
-const DEFAULT_PAGE_SIZE = 20;
 
 /** Default similarity threshold. */
 const DEFAULT_THRESHOLD = 0.5;
@@ -29,38 +30,7 @@ const VALID_TYPES: ReadonlySet<string> = new Set([
   "internship",
 ]);
 
-/** UUID v4 regex for basic validation. */
-const UUID_REGEX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 // ── Helpers ──────────────────────────────────────────────────────────────────
-
-/**
- * Decode a base64-encoded pagination cursor into score + id.
- * Returns null if the cursor is malformed.
- */
-function decodeCursor(cursor: string): RecommendationCursor | null {
-  try {
-    const decoded = JSON.parse(atob(cursor));
-    if (
-      typeof decoded.score === "number" &&
-      typeof decoded.id === "string" &&
-      UUID_REGEX.test(decoded.id)
-    ) {
-      return decoded as RecommendationCursor;
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Encode a pagination cursor to a base64 string.
- */
-function encodeCursor(cursor: RecommendationCursor): string {
-  return btoa(JSON.stringify(cursor));
-}
 
 /**
  * Apply exponential time-decay to a similarity score based on listing age.
@@ -171,7 +141,11 @@ export async function GET(request: NextRequest) {
   let cursorId: string | null = null;
 
   if (cursorParam !== null) {
-    const decoded = decodeCursor(cursorParam);
+    const decoded = decodeCursor<RecommendationCursor>(cursorParam, (d) =>
+      typeof d.score === "number" &&
+      typeof d.id === "string" &&
+      UUID_REGEX.test(d.id)
+    );
     if (!decoded) {
       return Response.json(
         { error: "Invalid 'cursor' parameter. Must be a valid pagination token." },

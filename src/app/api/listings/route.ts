@@ -6,11 +6,15 @@ import type {
   ListingsResponse,
   ListingType,
 } from "@/types/database";
+import {
+  MAX_PAGE_SIZE,
+  DEFAULT_PAGE_SIZE,
+  UUID_REGEX,
+  encodeCursor,
+  decodeCursor,
+} from "@/lib/utils/pagination";
 
 // ── Constants ────────────────────────────────────────────────────────────────
-
-const MAX_PAGE_SIZE = 50;
-const DEFAULT_PAGE_SIZE = 20;
 
 const VALID_TYPES: ReadonlySet<string> = new Set([
   "hackathon",
@@ -23,31 +27,6 @@ const VALID_LOCATIONS: ReadonlySet<string> = new Set([
   "india",
   "global",
 ]);
-
-const UUID_REGEX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-function decodeCursor(cursor: string): ListingCursor | null {
-  try {
-    const decoded = JSON.parse(atob(cursor));
-    if (
-      typeof decoded.popularity_score === "number" &&
-      typeof decoded.id === "string" &&
-      UUID_REGEX.test(decoded.id)
-    ) {
-      return decoded as ListingCursor;
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-function encodeCursor(cursor: ListingCursor): string {
-  return btoa(JSON.stringify(cursor));
-}
 
 // ── Route Handler ────────────────────────────────────────────────────────────
 
@@ -110,7 +89,11 @@ export async function GET(request: NextRequest) {
   let cursorId: string | null = null;
 
   if (cursorParam !== null) {
-    const decoded = decodeCursor(cursorParam);
+    const decoded = decodeCursor<ListingCursor>(cursorParam, (d) =>
+      typeof d.popularity_score === "number" &&
+      typeof d.id === "string" &&
+      UUID_REGEX.test(d.id)
+    );
     if (!decoded) {
       return Response.json(
         { error: "Invalid 'cursor' parameter. Must be a valid pagination token." },
