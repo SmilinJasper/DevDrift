@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /**
  * Hook for implementing infinite scroll via IntersectionObserver.
@@ -13,7 +13,7 @@ export function useInfiniteScroll(
   callback: () => void,
   options?: IntersectionObserverInit
 ) {
-  const sentinelRef = useRef<HTMLDivElement>(null);
+  const [node, setNode] = useState<HTMLElement | null>(null);
   const callbackRef = useRef(callback);
 
   useEffect(() => {
@@ -21,8 +21,7 @@ export function useInfiniteScroll(
   }, [callback]);
 
   useEffect(() => {
-    const sentinel = sentinelRef.current;
-    if (!sentinel) return;
+    if (!node) return;
 
     const observer = new IntersectionObserver((entries) => {
       const entry = entries[0];
@@ -31,13 +30,12 @@ export function useInfiniteScroll(
       }
     }, options || { rootMargin: "200px" });
 
-    observer.observe(sentinel);
+    observer.observe(node);
 
     return () => {
-      observer.unobserve(sentinel);
       observer.disconnect();
     };
-  }, [options]);
+  }, [node, options]);
 
-  return sentinelRef;
+  return setNode;
 }
