@@ -57,6 +57,7 @@ def _extract_salary(salary_val) -> str:
         return ""
     if isinstance(salary_val, dict):
         currency = salary_val.get("salaryCurrency") or ""
+        currency_prefix = f"{currency} " if currency else ""
         min_val = salary_val.get("salaryMin")
         max_val = salary_val.get("salaryMax")
         formatted = salary_val.get("formatted") or salary_val.get("salaryText") or salary_val.get("text")
@@ -65,12 +66,12 @@ def _extract_salary(salary_val) -> str:
             return str(formatted).strip()
         elif min_val is not None and max_val is not None:
             if min_val == max_val:
-                return f"{currency} {min_val}".strip()
-            return f"{currency} {min_val} - {max_val}".strip()
+                return f"{currency_prefix}{min_val}".strip()
+            return f"{currency_prefix}{min_val} - {max_val}".strip()
         elif min_val is not None:
-            return f"{currency} {min_val}+".strip()
+            return f"{currency_prefix}{min_val}+".strip()
         elif max_val is not None:
-            return f"Up to {currency} {max_val}".strip()
+            return f"Up to {currency_prefix}{max_val}".strip()
         return ""
     return str(salary_val).strip()
 
