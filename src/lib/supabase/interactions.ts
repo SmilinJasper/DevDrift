@@ -20,18 +20,17 @@ export async function saveListingOptimistic(listingId: string, userId: string): 
     }
   }
 
-  const supabase = createSupabaseBrowserClient();
-  const { error } = await supabase.from("interactions").insert({
-    listing_id: listingId,
-    user_id: userId,
-    kind: "save",
-  });
-  
-  if (error) {
+  try {
+    const res = await fetch("/api/interactions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ listing_id: listingId, kind: "save" }),
+    });
+    return res.ok;
+  } catch (error) {
     console.error("Error saving listing:", error);
     return false;
   }
-  return true;
 }
 
 /**
@@ -49,19 +48,17 @@ export async function unsaveListingOptimistic(listingId: string, userId: string)
     }
   }
 
-  const supabase = createSupabaseBrowserClient();
-  const { error } = await supabase
-    .from("interactions")
-    .delete()
-    .eq("listing_id", listingId)
-    .eq("user_id", userId)
-    .eq("kind", "save");
-    
-  if (error) {
+  try {
+    const res = await fetch("/api/interactions", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ listing_id: listingId, kind: "save" }),
+    });
+    return res.ok;
+  } catch (error) {
     console.error("Error unsaving listing:", error);
     return false;
   }
-  return true;
 }
 
 /**

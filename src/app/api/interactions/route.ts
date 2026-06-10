@@ -23,13 +23,11 @@ export async function POST(request: NextRequest) {
 
     const targetUserId = user ? user.id : MOCK_USER_ID;
 
-    // Use service role client if anonymous (to bypass RLS check on user_id)
-    const client = user 
-      ? supabase 
-      : createClient(
-          process.env.NEXT_PUBLIC_SUPABASE_URL!,
-          process.env.SUPABASE_SERVICE_ROLE_KEY!
-        );
+    // Always use service role client to bypass RLS missing policies on interactions
+    const client = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
 
     // Upsert or insert the interaction
     // The DB trigger will automatically update popularity_score
@@ -45,6 +43,47 @@ export async function POST(request: NextRequest) {
     if (error && error.code !== '23505') {
       console.error("[interactions] Error logging interaction:", error);
       return Response.json({ error: "Failed to log interaction" }, { status: 500 });
+    }
+
+    return Response.json({ success: true });
+  } catch (error) {
+    console.error("[interactions] Error:", error);
+    return Response.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const { listing_id, kind } = await request.json();
+
+    if (!listing_id || (kind !== "view" && kind !== "save")) {
+      return Response.json({ error: "Invalid parameters" }, { status: 400 });
+    }
+
+    const supabase = await createSupabaseServerClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user && kind === "save") {
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const targetUserId = user ? user.id : MOCK_USER_ID;
+
+    const client = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
+    const { error } = await client
+      .from("interactions")
+      .delete()
+      .eq("listing_id", listing_id)
+      .eq("user_id", targetUserId)
+      .eq("kind", kind);
+
+    if (error) {
+      console.error("[interactions] Error removing interaction:", error);
+      return Response.json({ error: "Failed to remove interaction" }, { status: 500 });
     }
 
     return Response.json({ success: true });
