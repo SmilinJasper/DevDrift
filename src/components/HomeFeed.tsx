@@ -51,7 +51,7 @@ export function HomeFeed() {
       // In this demo without real users, we might hit 400. Let's just fallback to /api/listings if so.
       if (!res.ok && res.status === 400) {
         console.warn("Falling back to generic listings because userId is invalid");
-        const fallbackRes = await fetch(`/api/listings?limit=12${isLoadMore && cursorRef.current ? `&cursor=${cursorRef.current}` : ""}`);
+        const fallbackRes = await fetch(`/api/listings?limit=12${isLoadMore && cursorRef.current ? `&cursor=${encodeURIComponent(cursorRef.current)}` : ""}`);
         if (!fallbackRes.ok) throw new Error("Fallback fetch failed");
         
         const json = await fallbackRes.json();

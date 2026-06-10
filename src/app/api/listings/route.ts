@@ -151,7 +151,7 @@ export async function GET(request: NextRequest) {
     // (popularity_score < cursorScore) OR (popularity_score = cursorScore AND id < cursorId)
     if (cursorScore !== null && cursorId !== null) {
       query = query.or(
-        `popularity_score.lt.${cursorScore},and(popularity_score.eq.${cursorScore},id.lt."${cursorId}")`
+        `popularity_score.lt.${cursorScore},and(popularity_score.eq.${cursorScore},id.lt.${cursorId})`
       );
     }
 

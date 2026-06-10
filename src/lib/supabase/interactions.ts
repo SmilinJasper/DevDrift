@@ -1,9 +1,25 @@
 import { createSupabaseBrowserClient } from "./client";
 
+const MOCK_USER_ID = "00000000-0000-0000-0000-000000000000";
+const LOCAL_STORAGE_KEY = "orbit_saved_listings";
+
 /**
  * Inserts a save interaction for a listing optimistically.
  */
 export async function saveListingOptimistic(listingId: string, userId: string): Promise<boolean> {
+  if (userId === MOCK_USER_ID && typeof window !== "undefined") {
+    try {
+      const saved = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || "[]");
+      if (!saved.includes(listingId)) {
+        saved.push(listingId);
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(saved));
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   const supabase = createSupabaseBrowserClient();
   const { error } = await supabase.from("interactions").insert({
     listing_id: listingId,
@@ -22,6 +38,17 @@ export async function saveListingOptimistic(listingId: string, userId: string): 
  * Removes a save interaction for a listing optimistically.
  */
 export async function unsaveListingOptimistic(listingId: string, userId: string): Promise<boolean> {
+  if (userId === MOCK_USER_ID && typeof window !== "undefined") {
+    try {
+      let saved = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || "[]");
+      saved = saved.filter((id: string) => id !== listingId);
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(saved));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   const supabase = createSupabaseBrowserClient();
   const { error } = await supabase
     .from("interactions")
@@ -41,6 +68,14 @@ export async function unsaveListingOptimistic(listingId: string, userId: string)
  * Fetches all saved listing IDs for a given user.
  */
 export async function getSavedListingIds(userId: string): Promise<string[]> {
+  if (userId === MOCK_USER_ID && typeof window !== "undefined") {
+    try {
+      return JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || "[]");
+    } catch {
+      return [];
+    }
+  }
+
   const supabase = createSupabaseBrowserClient();
   const { data, error } = await supabase
     .from("interactions")

@@ -96,7 +96,11 @@ export function ListingCard({
         </div>
         
         <button
-          onClick={() => onSaveToggle?.(listing.id, isSaved)}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onSaveToggle?.(listing.id, isSaved);
+          }}
           className={`p-2 rounded-full transition-colors ${
             isSaved ? "bg-dd-accent-glow text-dd-accent" : "hover:bg-muted text-muted-foreground hover:text-foreground"
           }`}
