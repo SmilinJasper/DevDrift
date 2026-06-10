@@ -148,8 +148,8 @@ def sync_listings(supabase: Client, normalized_listings: list, crawler_profile_i
     if ids_to_delete:
         print(f"Deleting {len(ids_to_delete)} old listings...")
         ids_list = list(ids_to_delete)
-        # Delete in batches of 50
-        batch_size = 50
+        # Delete in batches of 500
+        batch_size = 500
         for i in range(0, len(ids_list), batch_size):
             batch = ids_list[i:i+batch_size]
             try:
