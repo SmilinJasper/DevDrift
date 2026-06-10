@@ -86,7 +86,7 @@ export async function GET(request: NextRequest) {
         { status: 401 }
       );
     }
-    userId = queryUserId;
+    userId = queryUserId ?? undefined;
   }
 
   if (!userId || !UUID_REGEX.test(userId)) {
