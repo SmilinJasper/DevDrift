@@ -3,3 +3,5 @@ apify-client>=1.6.0
 playwright>=1.40.0
 beautifulsoup4>=4.12.0
 python-dateutil>=2.8.2
+pytest
+pytest-mock
