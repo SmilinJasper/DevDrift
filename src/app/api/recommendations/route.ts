@@ -104,7 +104,20 @@ export async function GET(request: NextRequest) {
   const supabase = await createSupabaseServerClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  const userId = user?.id || searchParams.get("userId");
+  const MOCK_USER_ID = "00000000-0000-0000-0000-000000000000";
+  const queryUserId = searchParams.get("userId");
+
+  let userId = user?.id;
+
+  if (!userId) {
+    if (queryUserId && queryUserId !== MOCK_USER_ID) {
+      return Response.json(
+        { error: "Unauthorized. Guest users may only request recommendations using the guest ID." },
+        { status: 401 }
+      );
+    }
+    userId = queryUserId;
+  }
 
   if (!userId || !UUID_REGEX.test(userId)) {
     return Response.json(
