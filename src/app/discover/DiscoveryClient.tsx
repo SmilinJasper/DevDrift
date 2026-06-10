@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useListings } from "@/hooks/useListings";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
+import { useUser } from "@/hooks/useUser";
 import { FilterBar } from "@/components/FilterBar";
 import { ListingCard } from "@/components/ListingCard";
 import { ListingCardSkeleton } from "@/components/ListingCardSkeleton";
@@ -19,16 +20,19 @@ export function DiscoveryClient() {
   const sentinelRef = useInfiniteScroll(loadMore);
   
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
-  const MOCK_USER_ID = "00000000-0000-0000-0000-000000000000";
+  const userId = useUser();
 
   useEffect(() => {
+    if (!userId) return;
     // Initial fetch of saved items
-    getSavedListingIds(MOCK_USER_ID).then((ids) => {
+    getSavedListingIds(userId).then((ids) => {
       setSavedIds(new Set(ids));
     });
-  }, []);
+  }, [userId]);
 
   const handleSaveToggle = async (id: string, currentlySaved: boolean) => {
+    if (!userId) return;
+
     // Optimistic UI update
     setSavedIds((prev) => {
       const next = new Set(prev);
@@ -40,9 +44,9 @@ export function DiscoveryClient() {
     // Fire network request
     let success = false;
     if (currentlySaved) {
-      success = await unsaveListingOptimistic(id, MOCK_USER_ID);
+      success = await unsaveListingOptimistic(id, userId);
     } else {
-      success = await saveListingOptimistic(id, MOCK_USER_ID);
+      success = await saveListingOptimistic(id, userId);
     }
 
     // Rollback if failed

@@ -62,7 +62,7 @@ export default async function ProfilePage() {
         </div>
 
         <form action={signOut}>
-          <Button variant="outline" className="text-red-500 hover:text-red-600 hover:bg-red-500/10 border-red-500/20">
+          <Button type="submit" variant="outline" className="text-red-500 hover:text-red-600 hover:bg-red-500/10 border-red-500/20">
             <LogOut className="w-4 h-4 mr-2" />
             Sign Out
           </Button>

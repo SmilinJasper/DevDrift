@@ -5,6 +5,7 @@ import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { ListingCard } from "./ListingCard";
 import { ListingCardSkeleton } from "./ListingCardSkeleton";
 import { saveListingOptimistic, unsaveListingOptimistic, getSavedListingIds } from "@/lib/supabase/interactions";
+import { useUser } from "@/hooks/useUser";
 import type { RecommendedListing, RecommendationResponse } from "@/types/database";
 
 export function HomeFeed() {
@@ -16,12 +17,13 @@ export function HomeFeed() {
   
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
   
-  // Hardcoded for now. Phase 4 will introduce Auth.
-  const MOCK_USER_ID = "00000000-0000-0000-0000-000000000000";
+  const userId = useUser();
   
   const cursorRef = useRef<string | null>(null);
 
   const fetchRecommendations = useCallback(async (isLoadMore = false) => {
+    if (!userId) return;
+
     if (isLoadMore) {
       setIsFetchingMore(true);
     } else {
@@ -33,13 +35,13 @@ export function HomeFeed() {
     try {
       // Fetch user's saved items once
       if (!isLoadMore) {
-        const ids = await getSavedListingIds(MOCK_USER_ID);
+        const ids = await getSavedListingIds(userId);
         setSavedIds(new Set(ids));
       }
 
       const params = new URLSearchParams();
-      // Using mock ID to hit fallback trending, or real recommendation if it exists.
-      params.set("userId", MOCK_USER_ID);
+      // Using user ID to hit real recommendation if it exists, or fallback to mock.
+      params.set("userId", userId);
       params.set("limit", "12");
       if (isLoadMore && cursorRef.current) {
         params.set("cursor", cursorRef.current);
@@ -85,21 +87,25 @@ export function HomeFeed() {
       setIsLoading(false);
       setIsFetchingMore(false);
     }
-  }, []);
+  }, [userId]);
 
   useEffect(() => {
-    fetchRecommendations(false);
-  }, [fetchRecommendations]);
+    if (userId) {
+      fetchRecommendations(false);
+    }
+  }, [fetchRecommendations, userId]);
 
   const loadMore = useCallback(() => {
-    if (hasMore && !isFetchingMore && !isLoading) {
+    if (hasMore && !isFetchingMore && !isLoading && userId) {
       fetchRecommendations(true);
     }
-  }, [hasMore, isFetchingMore, isLoading, fetchRecommendations]);
+  }, [hasMore, isFetchingMore, isLoading, fetchRecommendations, userId]);
 
   const sentinelRef = useInfiniteScroll(loadMore);
 
   const handleSaveToggle = async (id: string, currentlySaved: boolean) => {
+    if (!userId) return;
+
     // Optimistic UI update
     setSavedIds((prev) => {
       const next = new Set(prev);
@@ -111,9 +117,9 @@ export function HomeFeed() {
     // Fire network request
     let success = false;
     if (currentlySaved) {
-      success = await unsaveListingOptimistic(id, MOCK_USER_ID);
+      success = await unsaveListingOptimistic(id, userId);
     } else {
-      success = await saveListingOptimistic(id, MOCK_USER_ID);
+      success = await saveListingOptimistic(id, userId);
     }
 
     // Rollback if failed
