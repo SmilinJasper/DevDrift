@@ -1,370 +1,177 @@
-# DevDrift — Project State & Implementation Plan
+# DevDrift — Project State & Hand-off Document
 
-> **Last updated:** June 8, 2026  
-> **Phase:** 1 (Foundation) ✅ · 2 (Data Aggregation & Scraper) ✅ · 3 (Core UI & Recommendations) ✅ · 4 (Auth & Onboarding) ✅  
-> **Build Status:** ✅ Production build passes (`npm run build` — compiled successfully)
-> **Supabase Status:** ✅ Schema configured with pgvector and automated triggers
-
----
-
-## Table of Contents
-
-1. [Project Overview](#1-project-overview)
-2. [Tech Stack & Architecture](#2-tech-stack--architecture)
-3. [Project Structure](#3-project-structure)
-4. [Supabase Database Schema](#4-supabase-database-schema)
-5. [Authentication & Session Management](#5-authentication--session-management)
-6. [Data Aggregation & Scraping (Orbit Pipeline)](#6-data-aggregation--scraping-orbit-pipeline)
-7. [Recommendation Engine & API](#7-recommendation-engine--api)
-8. [Implementation Checklist (Completed)](#8-implementation-checklist-completed)
-9. [Setup & Configuration Guide](#9-setup--configuration-guide)
-10. [Pending Requirements & Next Steps](#10-pending-requirements--next-steps)
+> **Last Updated:** June 11, 2026  
+> **Conversational Status:** Compiled codebase, completed key authentication, interaction routing, scraper pagination, and audit foundations. Ready for further development.
+> **Build Status:** ✅ Production build passes (`npm run build` compiles successfully)
+> **Active Dev Server:** `npm run dev` running on `localhost`
 
 ---
 
-## 1. Project Overview
+## 1. Project Overview & Architecture
 
-**DevDrift** is a premium developer opportunity discovery platform designed to aggregate, categorize, and recommend hackathons, jobs, and internships.
-Built with a dark-mode-first aesthetic (utilizing Tailwind CSS v4, Framer Motion, and Shadcn UI), DevDrift features:
-- **Semantic Discovery:** Powered by `pgvector` with 384-dimensional opportunity embeddings.
-- **Personalized Recommendation Feed:** Uses cosine similarity and tag-overlap fallback re-ranked by time-decay.
-- **Robust Scraping (Orbit):** A scheduled Python pipeline leveraging Apify Managed Scraping Actors to bypass anti-bot protections.
-
----
-
-## 2. Tech Stack & Architecture
-
-### 2.1 Core Technologies
-- **Framework:** Next.js (App Router) `16.2.7`
-- **Frontend Core:** React `19.2.4` & TypeScript `^5` (Strict Mode)
-- **Styling:** Tailwind CSS `^4` (OKLCH color space theme variables, premium gradients, card glows)
-- **Animations:** Framer Motion `^12.40.0` (smooth spring-physics transitions, tab transitions)
-- **Database:** Supabase PostgreSQL with `pgvector` (vector index support) and custom triggers
-- **Local Embedding Engine:** `@xenova/transformers` (`all-MiniLM-L6-v2` model running locally to create user/listing embeddings)
-- **Scraper (Orbit):** Python `3.11` + Playwright (for Devpost) + Apify SDK client (for Indeed and LinkedIn via `curious_coder/linkedin-jobs-scraper`)
-- **Scheduler:** GitHub Actions (configured to run on a 12-hour cron job)
-
-### 2.2 System Architecture Diagram
+**DevDrift** is a modern developer opportunity aggregator and recommendation platform. It combines a high-aesthetic Next.js App Router web frontend with a Postgres + `pgvector` Supabase backend, supported by a Python scraping pipeline (codenamed **Orbit**).
 
 ```mermaid
 graph TB
-    subgraph Client["Browser (Client)"]
-        RSC["React Server Components"]
-        CC["Client Components"]
-        TW["Tailwind CSS v4 + Shadcn UI"]
+    subgraph Client["Browser Client (React 19)"]
+        CC["Client Components (Discovery, Profile)"]
+        useUser["useUser Hook (Session / LocalStorage Fallback)"]
     end
 
-    subgraph NextJS["Next.js 16 App Router"]
-        Pages["Pages & Layouts"]
-        API["API Routes"]
-        MW["Middleware (src/proxy.ts)"]
+    subgraph NextJS["Next.js Server API Layer"]
+        API_Int["/api/interactions (Service Role Bypass)"]
+        API_Rec["/api/recommendations (Re-ranking & Time-decay)"]
+        API_List["/api/listings (Search & Filters)"]
     end
 
-    subgraph Orbit["Orbit Scraper (12h Cron)"]
-        GHA["GitHub Actions Workflow"]
+    subgraph Supabase["Supabase DB"]
+        DB["Postgres (pgvector)"]
+        Triggers["triggers (popularity, auto-profiles)"]
+    end
+
+    subgraph Orbit["Orbit Scraper Pipeline"]
         PY["Python Orchestrator"]
-        PW["Playwright (Devpost)"]
-        AP["Apify Actors (Indeed & LinkedIn)"]
+        WWR["WeWorkRemotely Scraper"]
+        Apify["Indeed & LinkedIn Actors"]
+        Playwright["Devpost Playwright Crawler"]
     end
 
-    subgraph Supabase["Supabase Platform"]
-        Auth["Supabase Auth (Google OAuth)"]
-        DB["PostgreSQL + pgvector"]
-        Triggers["Triggers (Popularity & Auto-Profiles)"]
-    end
-
-    Client --> NextJS
-    Pages --> RSC
-    Pages --> CC
-    RSC --> TW
-    CC --> TW
-    API --> Auth
-    API --> DB
+    CC --> useUser
+    useUser --> API_Int
+    CC --> API_Int
+    CC --> API_Rec
+    API_Int --> DB
+    API_Rec --> DB
+    API_List --> DB
     Orbit --> DB
 ```
 
 ---
 
-## 3. Project Structure
+## 2. Completed Milestones
+
+### 2.1 WeWorkRemotely RSS Scraper Integration
+- **Scraper Added:** Created [weworkremotely.py](file:///c:/Users/SmilinJasper/Desktop/projects/Test/DevDrift/scraper/weworkremotely.py) to parse the WeWorkRemotely RSS feed (`remote-programming-jobs.rss`). It filters jobs using default keywords.
+- **Normalizer Rules:** Added `normalize_wwr_job` in [normalizer.py](file:///c:/Users/SmilinJasper/Desktop/projects/Test/DevDrift/scraper/normalizer.py) to extract clean job titles, company metadata (stripping `"Company: Title"` format), descriptions (stripping HTML tags), and tag classifying remote parameters.
+- **Sync integration:** Wired source hooks inside [jobs.py](file:///c:/Users/SmilinJasper/Desktop/projects/Test/DevDrift/scraper/jobs.py) and [main.py](file:///c:/Users/SmilinJasper/Desktop/projects/Test/DevDrift/scraper/main.py) to include WeWorkRemotely in the main scraping pipeline.
+
+### 2.2 Next.js Client Authentication Hook (`useUser`)
+- **Dynamic Session Loading:** Replaced hardcoded client-side guest profiles (the `MOCK_USER_ID`) with the [useUser.ts](file:///c:/Users/SmilinJasper/Desktop/projects/Test/DevDrift/src/hooks/useUser.ts) custom React hook.
+- **Session Observer:** The hook observes Supabase authentication states on client mount. If an active session is found, it supplies the user's authentic `UUID`. For unauthenticated visitors, it falls back to the Guest ID (`00000000-0000-0000-0000-000000000000`) and falls back to syncing interactions via LocalStorage (`orbit_saved_listings`).
+
+### 2.3 Custom Interactions API Layer (Bypassing Supabase RLS Limits)
+- **RLS Write Failure Fixed:** Fixed a bug where saved opportunities did not persist or show up in the user profile dashboard because client-side direct writes to the `interactions` table were blocked by restrictive Row Level Security (RLS) policies.
+- **API Endpoint:** Created `/api/interactions` in [route.ts](file:///c:/Users/SmilinJasper/Desktop/projects/Test/DevDrift/src/app/api/interactions/route.ts) that handles `POST` and `DELETE` requests.
+- **Service Role Execution:** Next.js Server routes process requests using the privileged `SUPABASE_SERVICE_ROLE_KEY` to securely update the database, allowing users to save/unsave elements.
+- **Client Adaptor Refactor:** Modified `saveListingOptimistic` and `unsaveListingOptimistic` in [interactions.ts](file:///c:/Users/SmilinJasper/Desktop/projects/Test/DevDrift/src/lib/supabase/interactions.ts) to send HTTP requests to the new API router instead of direct client-side insertions.
+
+### 2.4 Profile Sign-Out Button Bugfix
+- **Sign-Out Fix:** Added `type="submit"` to the form button in [src/app/profile/page.tsx](file:///c:/Users/SmilinJasper/Desktop/projects/Test/DevDrift/src/app/profile/page.tsx) to ensure clicking the sign-out button correctly invokes the server action backend handler.
+
+### 2.5 Scraper Pagination Fix (Bypassing the Supabase 1000-Row Select Limit)
+- **Problem:** Supabase enforces a hard limit of 1000 returned rows on `select()` calls. The Python sync pipeline in [db.py](file:///c:/Users/SmilinJasper/Desktop/projects/Test/DevDrift/scraper/db.py) used to pull existing jobs in a single call to detect updates. Once the database reached 1000+ entries, older entries were ignored, causing duplicates and incorrect deletions.
+- **Fix:** Implemented chunk-based pagination inside a `while` loop using `.range(start, end)` in [scraper/db.py](file:///c:/Users/SmilinJasper/Desktop/projects/Test/DevDrift/scraper/db.py#L92-L108). The scraper now loads all existing listings paginated, ensuring accurate synchronization regardless of database size.
+
+---
+
+## 3. Current Directory Layout
 
 ```
 DevDrift/
-├── .github/
-│   └── workflows/
-│       └── scrape.yml              # GitHub Actions scraper cron (12-hour schedule)
-├── scraper/                        # Orbit Data Aggregation Scraper Pipeline (Python)
-│   ├── config.py                   # Indeed/LinkedIn crawler configurations & targets
-│   ├── apify.py                    # Apify SDK integration for Indeed & LinkedIn actors
-│   ├── normalizer.py               # Field standardizer & job/internship auto-classifier
-│   ├── jobs.py                     # Indeed & LinkedIn search merger and de-duplicator
-│   ├── devpost.py                  # Playwright-based Devpost scraper
-│   ├── db.py                       # Supabase client integration & sync layers
-│   ├── requirements.txt            # Python dependencies (apify-client, playwright, supabase, etc.)
-│   └── main.py                     # Entrypoint orchestration script
+├── scraper/                        # Orbit scraping engine (Python 3.11)
+│   ├── main.py                     # Entry point orchestrator
+│   ├── db.py                       # Syncs scraped jobs to DB (paginated select fix)
+│   ├── weworkremotely.py           # [NEW] WeWorkRemotely RSS feed parser
+│   ├── normalizer.py               # Field classifier and HTML-stripper (updated)
+│   └── jobs.py                     # Job aggregator configuration mapping
 ├── src/
-│   ├── app/                        # Next.js App Router Pages
-│   │   ├── (auth)/
-│   │   │   └── login/
-│   │   │       ├── actions.ts      # Server actions (Credentials & Google OAuth with dynamic redirect)
-│   │   │       └── page.tsx        # Sign-in/Sign-up page
+│   ├── app/
 │   │   ├── api/
-│   │   │   ├── listings/           # GET /api/listings (paginated search)
-│   │   │   └── recommendations/    # GET /api/recommendations (personalized feed)
-│   │   ├── auth/
-│   │   │   └── callback/
-│   │   │       └── route.ts        # GET auth callback (handles OAuth token exchanging & redirect)
+│   │   │   ├── interactions/       # [NEW] POST/DELETE routes using service role
+│   │   │   └── recommendations/    # Re-ranking & decay API endpoint
 │   │   ├── discover/
-│   │   │   ├── page.tsx            # Discover page shell
-│   │   │   └── DiscoveryClient.tsx # Search & filter feed
-│   │   ├── onboarding/
-│   │   │   └── page.tsx            # User interest tag selector (onboarding page)
-│   │   ├── profile/
-│   │   │   └── page.tsx            # User profile dashboard (saved listings & tags)
-│   │   ├── globals.css             # Tailwind v4 theme configurations
-│   │   ├── layout.tsx              # Base page layout (Outfit font, dark mode)
-│   │   └── page.tsx                # Home feed and landing layout
+│   │   │   └── DiscoveryClient.tsx # Search, layout, filters & pagination UI
+│   │   └── profile/
+│   │       └── page.tsx            # Dashboard containing saved listings and sign-out controls
 │   ├── components/
-│   │   ├── FilterBar.tsx           # Search/filter controls
-│   │   ├── HomeFeed.tsx            # Infinite scroll feed
-│   │   ├── ListingCard.tsx         # Opportunity card component (optimistic saving state)
-│   │   ├── ListingCardSkeleton.tsx # Shimmer placeholders
-│   │   ├── Navbar.tsx              # Server components shell
-│   │   └── NavbarClient.tsx        # Authenticated UI controls
+│   │   ├── HomeFeed.tsx            # Infinite scroll opportunity cards
+│   │   └── ListingCard.tsx         # Premium design cards (optimistic save hooks)
 │   ├── hooks/
-│   │   ├── useInfiniteScroll.ts    # Observer hooks
-│   │   └── useListings.ts          # Listings search hook
-│   ├── lib/
-│   │   ├── supabase/
-│   │   │   ├── client.ts           # Browser client
-│   │   │   ├── server.ts           # Server client (cookies based)
-│   │   │   ├── middleware.ts       # Token refresh helper
-│   │   │   └── interactions.ts     # Save/Unsave DB integrations
-│   │   └── utils.ts                # Tailwind class mergers
-│   ├── proxy.ts                    # Middleware runner (invokes src/lib/supabase/middleware.ts)
-│   └── types/
-│       └── database.ts             # Database models
-├── supabase/
-│   └── migrations/
-│       ├── 00001_initial_schema.sql         # Database tables, RLS, custom functions
-│       ├── 00002_recommendation_engine.sql  # Cosine similarity recommendation engine
-│       └── 00003_popularity_trigger.sql     # View/save interaction-driven popularity triggers
+│   │   ├── useInfiniteScroll.ts    # Observer targets state-hook (refactored)
+│   │   └── useUser.ts              # [NEW] Auth-listener session hook
+│   └── lib/
+│       └── supabase/
+│           └── interactions.ts     # Save/Unsave HTTP requests (updated)
 ```
-
-> [!NOTE]
-> Next.js middleware is located in [src/proxy.ts](file:///c:/Users/SmilinJasper/Desktop/projects/Test/DevDrift/src/proxy.ts) which acts as the edge middleware. Note that for standard Next.js routing detection without custom build scripts, this file should ideally be named `middleware.ts` in the root of `src/`.
 
 ---
 
 ## 4. Supabase Database Schema
 
-### 4.1 Extensions
-- `vector` (schema: extensions): 384-dimensional vector embedding column.
-- `pg_trgm` (schema: extensions): Trigrams support for fuzzy text matching.
-- `moddatetime` (schema: extensions): Auto updated_at timestamp trigger integration.
+### 4.1 Core Tables
+1. **`public.profiles`**: Contains usernames, bio, custom interest tags (`interests` text array), and local 384-dimensional interest embeddings (`interest_embedding`).
+2. **`public.listings`**: Aggregated opportunity details: description, tags, type, location, application links, popularity metrics, and embeddings.
+3. **`public.interactions`**: Logs interactions (`view` or `save`) mapping user UUIDs to listing UUIDs. It features a unique index to prevent duplicate saves.
 
-### 4.2 Custom Enums
-- `public.listing_type`: `'hackathon' | 'job' | 'internship'`
-- `public.interaction_kind`: `'view' | 'save'`
-
-### 4.3 Database Tables
-
-#### Table: `public.profiles`
-- `id` (UUID, primary key): References `auth.users(id)` (ON DELETE CASCADE)
-- `username` (TEXT, unique): Required (length constraint: 3–40 characters)
-- `full_name` (TEXT)
-- `avatar_url` (TEXT)
-- `bio` (TEXT): Constraint <= 500 characters
-- `interests` (TEXT[]): Array of tags representing user interests
-- `interest_embedding` (vector(384)): Local semantic representation of interest tags
-- `location` (TEXT)
-- `website_url` (TEXT)
-- `created_at` (TIMESTAMPTZ, default now())
-- `updated_at` (TIMESTAMPTZ, default now())
-
-#### Table: `public.listings`
-- `id` (UUID, primary key): Default `gen_random_uuid()`
-- `created_by` (UUID): References `public.profiles(id)` (ON DELETE CASCADE)
-- `title` (TEXT): Required (length constraint: 1–200 characters)
-- `description` (TEXT)
-- `type` (`public.listing_type`): Enum type (`hackathon`, `job`, `internship`)
-- `tags` (TEXT[]): List of tags/skills
-- `location` (TEXT): Free-form string representation (e.g., "Remote", "India", "San Francisco")
-- `is_remote` (BOOLEAN): Default false
-- `starts_at` (TIMESTAMPTZ)
-- `ends_at` (TIMESTAMPTZ)
-- `application_url` (TEXT): Unique application redirect url (used as primary de-duplication key)
-- `popularity_score` (FLOAT): Defaults to `0.0`
-- `embedding` (vector(384)): Vector representation of the listing for search / similarity
-- `is_published` (BOOLEAN): Default true
-- `created_at` (TIMESTAMPTZ, default now())
-- `updated_at` (TIMESTAMPTZ, default now())
-
-#### Table: `public.interactions`
-- `id` (UUID, primary key): Default `gen_random_uuid()`
-- `user_id` (UUID): References `public.profiles(id)` (ON DELETE CASCADE)
-- `listing_id` (UUID): References `public.listings(id)` (ON DELETE CASCADE)
-- `kind` (`public.interaction_kind`): Enum type (`view`, `save`)
-- `created_at` (TIMESTAMPTZ, default now())
-- *Constraint:* Unique composite index on `(user_id, listing_id, kind)` to prevent duplicate saves.
-
-### 4.4 Automated Database Triggers
-1. **Timestamp Triggers:** Auto-updates `updated_at` timestamps on `public.profiles` and `public.listings` when rows update.
-2. **Auto-Profile Trigger (`on_auth_user_created`):** When a new user signs up in `auth.users`, a database trigger calls `handle_new_user()` to automatically create a matching `public.profiles` row with username defaults.
-3. **Popularity Score Trigger (`trigger_update_listing_popularity`):** Attached to `public.interactions`. Automatically updates listing popularity when saves or views are registered or removed:
-   - Save Registered: `+5.0`
-   - View Registered: `+1.0`
-   - Save Removed (Unsaved): `-5.0`
-   - View Removed: `-1.0`
-   - Floor constraint prevents `popularity_score` from falling below `0.0`.
+### 4.2 Automation Triggers
+* **Auto-Profile Trigger**: Creates a public profile entry when a user signs up.
+* **Popularity Scorer Trigger**: Listens for saves/views. Updates the listing `popularity_score` instantly (`+5.0` for save, `+1.0` for view, `-5.0` for unsave, `-1.0` for unview) with a floor constraint of `0.0`.
 
 ---
 
-## 5. Authentication & Session Management
+## 5. Audit Findings & Remaining Tasks
 
-DevDrift supports Sign-In and Sign-Up using:
-1. **Credentials:** Email and password flow.
-2. **OAuth Provider:** Google Authentication.
+A comprehensive codebase audit was completed and is stored in [implementation_plan.md](file:///C:/Users/SmilinJasper/.gemini/antigravity-ide/brain/2bc90cb1-fb05-4455-813b-95a107413e3e/implementation_plan.md). Below is the backlog of remaining audit tasks.
 
-### 5.1 Dynamic Redirect Resolution (Vercel Fix)
-To prevent authentication flows from redirecting users to `localhost` when logging in on production deployments, redirects are dynamically resolved using Vercel environments and request headers:
-- **Server Action Setup (`loginWithGoogle` in actions.ts):**
-  ```typescript
-  const getSiteUrl = async () => {
-    if (process.env.NEXT_PUBLIC_SITE_URL) return process.env.NEXT_PUBLIC_SITE_URL;
-    if (process.env.VERCEL_PROJECT_PRODUCTION_URL) return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
-    if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
-    
-    // Fully dynamic fallback using request host headers
-    const headersList = await headers();
-    const host = headersList.get("host");
-    const protocol = headersList.get("x-forwarded-proto") || "https";
-    return `${protocol}://${host}`;
-  };
-  ```
-- **Callback Verification (`auth/callback/route.ts`):** Resolves the target host via the `host` and `x-forwarded-proto` headers:
-  ```typescript
-  const headersList = await headers();
-  const host = headersList.get("host");
-  const protocol = headersList.get("x-forwarded-proto") || "https";
-  const origin = host ? `${protocol}://${host}` : new URL(request.url).origin;
-  ```
+```markdown
+- [ ] **2. Security Vulnerabilities**
+  - [ ] **2.1. Unauthenticated ID Forging in Recommendations**
+    - *File:* [src/app/api/recommendations/route.ts](file:///c:/Users/SmilinJasper/Desktop/projects/Test/DevDrift/src/app/api/recommendations/route.ts)
+    - *Action:* Restrict `searchParams.get("userId")` to permit the guest profile ID (`MOCK_USER_ID`) only. Return `401 Unauthorized` if an unauthenticated user provides a valid database user UUID.
+  - [ ] **2.2. Unprotected Views Endpoint (Rate Limiting)**
+    - *File:* [src/app/api/interactions/route.ts](file:///c:/Users/SmilinJasper/Desktop/projects/Test/DevDrift/src/app/api/interactions/route.ts)
+    - *Action:* Protect against view-spamming by tracking view events locally or using cookies, preventing a single user from inflating listing popularity.
 
----
+- [ ] **3. Performance Bottlenecks**
+  - [ ] **3.1. Intersection Observer Pooling**
+    - *File:* [src/components/ListingCard.tsx](file:///c:/Users/SmilinJasper/Desktop/projects/Test/DevDrift/src/components/ListingCard.tsx)
+    - *Action:* Eliminate multiple individual intersection observers. Set up a shared observer hook/singleton to monitor visible cards and trigger view logging.
+  - [ ] **3.2. Scraper Deletion Batches**
+    - *File:* [scraper/db.py](file:///c:/Users/SmilinJasper/Desktop/projects/Test/DevDrift/scraper/db.py)
+    - *Action:* Increase the deletion batch size from `50` to `500` to speed up database synchronization cycles.
 
-## 6. Data Aggregation & Scraping (Orbit Pipeline)
+- [ ] **4. Clean Code & Refactoring**
+  - [ ] **4.1. Deduplicate Keyset Pagination & Base64 Logic**
+    - *Files:* [src/app/api/listings/route.ts](file:///c:/Users/SmilinJasper/Desktop/projects/Test/DevDrift/src/app/api/listings/route.ts) and [src/app/api/recommendations/route.ts](file:///c:/Users/SmilinJasper/Desktop/projects/Test/DevDrift/src/app/api/recommendations/route.ts)
+    - *Action:* Extract shared pagination logic, constants, and base64 helper functions into a common file (e.g., `src/lib/utils/pagination.ts`). Replace the error-prone `atob`/`btoa` with Node-compatible `Buffer` base64 functions.
 
-Direct scraping of platforms (LinkedIn, Glassdoor, Indeed) using Playwright in continuous integration (GitHub Actions) causes immediate blockage due to anti-bot measures. The Orbit scraper pipeline is migrated to use Apify's Managed Actors.
-
-### 6.1 Architecture & Components
-- **Orchestration (`scraper/main.py`):** Runs the pipeline in 3 stages:
-  - Stage 1: Devpost Hackathons scraping (using local Playwright).
-  - Stage 2: Jobs/Internships scraping (executes Indeed/LinkedIn Apify actors, normalizes schema, runs deduplication).
-  - Stage 3: Syncs outputs into Supabase using a Service Role client.
-- **Indeed Scraper (`borderline/indeed-scraper`):** 
-  - Searches country inputs: `["us", "in"]` (United States, India).
-  - Search keywords: `"software intern"`, `"software"`.
-  - Max items limit: `15` items per query to preserve free-tier credits.
-- **LinkedIn Scraper (`curious_coder/linkedin-jobs-scraper`):**
-  - Scrapes opportunities using pre-formed, time-sorted incognito search queries.
-  - Search URL targets:
-    - Keywords: "software" in India.
-    - Keywords: "software intern" globally.
-    - Keywords: "software" globally.
-  - Max items limit: `25` across all URLs combined.
-  - Scrapes with `scrapeCompany = False` to optimize credits.
-
-### 6.2 Data Normalization & Auto-Classification
-- **Indeed normalizer mappings:** Maps `positionName` to title, appends `company` name to title, strips HTML from description, maps apply link (with fallback to default url), and classifies.
-- **LinkedIn normalizer mappings:** Maps `title` to title, appends `company` to title, strips HTML, maps `jobUrl`, parses posted dates into starts_at format, and extracts tags.
-- **Auto-Detection (`_detect_listing_type` in normalizer.py):** Auto-classifies whether listings are `internship` or `job` based on regex searches for internship keywords (`\b(intern|internship|co-op|coop)\b`) in listing titles and descriptions. Standardizes output types to fit `public.listing_type` values (`job`, `internship`, `hackathon`).
-
-### 6.3 Multi-Level Deduplication
-To prevent duplicate opportunity synchronization:
-- **Indeed Deduplication:** Filters and deduplicates listings by URL/apply link during raw scraping.
-- **LinkedIn Deduplication:** Filters results by unique `jobUrl` during scraping.
-- **Cross-Source Deduplication:** Combines Indeed and LinkedIn scraped structures, executing a case-insensitive match on a compounded key: `{title}|{company}`. If a job is listed on both platforms, only the first encountered instance is synced.
-- **Supabase Upsert Sync:** Inside `scraper/db.py`, queries the database for existing opportunities and checks `application_url` collisions, performing updates on existing records and inserts on new records.
-
----
-
-## 7. Recommendation Engine & API
-
-### 7.1 Database RPC `recommend_listings_for_user`
-Implemented in `00002_recommendation_engine.sql`. Accept parameters `p_user_id`, `p_match_threshold`, `p_limit`, `p_cursor_score`, and `p_cursor_id`. Uses two strategies:
-1. **Strategy 1 (Vector Match):** If user has computed interest embeddings, queries listings sorted by `1 - (listing.embedding <=> user.interest_embedding)` descending.
-2. **Strategy 2 (Fallback Score):** If user has no embeddings set, calculates matching score:
-   $$\text{Score} = (\text{Overlap Ratio} \times 0.7) + (\text{Normalized Popularity} \times 0.3)$$
-   where overlap is the number of shared tags divided by user tags.
-- Both strategies exclude opportunities the user has already saved or viewed.
-- Supports keyset pagination using composite cursor scores and IDs.
-
-### 7.2 API Server Re-ranking
-The recommendation route `GET /api/recommendations` retrieves listings from the database RPC and overlays a temporal decay function:
-$$\text{final\_score} = \text{similarity} \times e^{-0.01 \times \text{days\_since\_created}}$$
-This decay re-ranks listings server-side, boosting newly aggregated opportunities and pushing older records down, without degrading indexing speeds inside Postgres.
-
----
-
-## 8. Implementation Checklist (Completed)
-
-- [x] **Project Scaffolding:** Tailwind CSS v4, Next.js 16 (App Router), Shadcn UI elements (`button`, `card`, `tabs`, `input`, `badge`, `skeleton`, `dialog`), Outfit geometric font styling.
-- [x] **Supabase Integration:** Client utilities (`client.ts`, `server.ts`, `middleware.ts`, `interactions.ts`) configured using cookie-based token exchanges.
-- [x] **Authentication Flow:** Credential login/signup, Google OAuth with dynamic redirect URL resolution via host headers for Vercel deployment.
-- [x] **Onboarding Process:** Page for users to select interest tags, saving tags directly, and triggering profile creation.
-- [x] **Database Architecture:** `profiles`, `listings`, and `interactions` schemas. Indexes created for username search, tag queries, popularity indexes, and `IVFFlat` pgvector query optimizations. Triggers for modified dates and interaction-based popularity scoring.
-- [x] **Scraper Transition (Orbit):** Python pipeline using Apify Client SDK to crawl Indeed and LinkedIn. Auto-detects job vs internship listing types. Implements source-specific and title-company cross-source deduplication.
-- [x] **Discovery Feed UI:** Interactive listings feed (`DiscoveryClient.tsx` + `HomeFeed.tsx`) with Framer Motion spring actions, active filters for listing types, keyword filtering, and optimistic save buttons.
-- [x] **User Dashboard:** Profile page (`src/app/profile/page.tsx`) illustrating saved user opportunities and active interest tags.
-- [x] **GitHub Actions Workflow:** `.github/workflows/scrape.yml` configured to trigger every 12 hours with environment vars and secret mapping.
-
----
-
-## 9. Setup & Configuration Guide
-
-To deploy or test the application locally or in production, ensure the following configurations are complete.
-
-### 9.1 Environment Variables (`.env.local`)
-Create a `.env.local` file in the project root:
-```bash
-# Supabase Configurations
-NEXT_PUBLIC_SUPABASE_URL=https://your-supabase-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
-
-# Scraper Pipeline Credentials (Required for scraper/main.py)
-APIFY_API_TOKEN=your-apify-api-token
+- [ ] **5. Unhandled Edge Cases**
+  - [ ] **5.1. UI State Flash on Saved Items**
+    - *File:* [src/app/discover/DiscoveryClient.tsx](file:///c:/Users/SmilinJasper/Desktop/projects/Test/DevDrift/src/app/discover/DiscoveryClient.tsx)
+    - *Action:* Disable bookmark buttons or show a loading skeleton while `getSavedListingIds()` fetches the user's saved items on initial mount.
+  - [ ] **5.2. Malformed Salary Formats in Normalizer**
+    - *File:* [scraper/normalizer.py](file:///c:/Users/SmilinJasper/Desktop/projects/Test/DevDrift/scraper/normalizer.py)
+    - *Action:* Update `_extract_salary` to handle cases where the currency is empty to prevent weird outputs (like `" 1000 - 2000"`).
 ```
 
-### 9.2 GitHub Secrets (For Scraper Pipeline)
-Add the following secrets to your GitHub Repository settings (`Settings > Secrets and variables > Actions`):
-- `SUPABASE_URL`
-- `SUPABASE_SERVICE_ROLE_KEY`
-- `APIFY_API_TOKEN`
-
-### 9.3 Apify Actor Setup
-Before running the scraping pipeline, add the following actors to your Apify account (free tier supports up to $5/month credits):
-1. **Indeed Scraper:** `borderline/indeed-scraper`
-2. **LinkedIn Jobs Scraper:** `curious_coder/linkedin-jobs-scraper`
-
 ---
 
-## 10. Pending Requirements & Next Steps
+## 6. How to Run & Validate
 
-When continuing in a new conversation, focus on the following tasks:
+### 6.1 Run Frontend
+```powershell
+npm run dev
+```
 
-### 10.1 Production Scraper Test
-- [ ] Run the scrape workflow in dry-run mode in the GHA environment to verify credential integration.
-- [ ] Trigger the live scraper to sync crawled Indeed and LinkedIn results to the database and review record counts.
+### 6.2 Test Database Pagination Logic (Scraper Helper)
+A test script exists to simulate cursor pagination and confirm the page-by-page scraper execution:
+```powershell
+python test-pagination.py
+node test-pagination.js
+```
 
-### 10.2 Semantic Natural Language Search
-- [ ] Incorporate a search bar inside `FilterBar.tsx` for natural language querying.
-- [ ] Build a database API search route `POST /api/search` using the `match_listings` Postgres RPC to calculate cosine vector similarity of search terms.
-- [ ] Auto-calculate query embeddings client-side or server-side utilizing `@xenova/transformers`.
-
-### 10.3 Profile Session Middleware Optimization
-- [ ] Ensure that `src/proxy.ts` is renamed to `src/middleware.ts` in the project root so Next.js correctly intercepts requests on edge runtimes.
-- [ ] Replace temporary client-side guest fallback IDs with actual session credentials.
-
-### 10.4 View Tracking Analytics
-- [ ] Implement event log tracking inside the Listing details page or on card expanded actions to record "view" interactions.
-- [ ] Connect tracking to trigger database popularity updates.
+### 6.3 Run the Scraper Locally
+```powershell
+python scraper/main.py --dry-run
+```
+*(Remove `--dry-run` to execute actual Supabase upserts.)*
