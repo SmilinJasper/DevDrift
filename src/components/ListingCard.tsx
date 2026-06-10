@@ -27,6 +27,7 @@ function formatDateRange(start: string | null, end: string | null) {
 }
 
 import { useEffect, useRef } from "react";
+import { viewObserver } from "@/hooks/useViewObserver";
 
 export function ListingCard({
   listing,
@@ -39,32 +40,21 @@ export function ListingCard({
   const cardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    let observer: IntersectionObserver;
-    let timeout: NodeJS.Timeout;
-
-    if (cardRef.current) {
-      observer = new IntersectionObserver(
-        (entries) => {
-          if (entries[0].isIntersecting) {
-            timeout = setTimeout(() => {
-              fetch("/api/interactions", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ listing_id: listing.id, kind: "view" }),
-              }).catch(() => {});
-            }, 1500); // 1.5 second threshold to prevent spam while scrolling fast
-          } else {
-            clearTimeout(timeout);
-          }
-        },
-        { threshold: 0.5 }
-      );
-      observer.observe(cardRef.current);
+    const el = cardRef.current;
+    if (el) {
+      viewObserver.observe(el, () => {
+        fetch("/api/interactions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ listing_id: listing.id, kind: "view" }),
+        }).catch(() => {});
+      });
     }
 
     return () => {
-      clearTimeout(timeout);
-      if (observer) observer.disconnect();
+      if (el) {
+        viewObserver.unobserve(el);
+      }
     };
   }, [listing.id]);
 
