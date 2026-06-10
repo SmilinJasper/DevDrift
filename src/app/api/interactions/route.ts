@@ -1,6 +1,7 @@
 import { type NextRequest } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createClient } from "@supabase/supabase-js";
+import { cookies } from "next/headers";
 
 const MOCK_USER_ID = "00000000-0000-0000-0000-000000000000";
 
@@ -10,6 +11,37 @@ export async function POST(request: NextRequest) {
 
     if (!listing_id || (kind !== "view" && kind !== "save")) {
       return Response.json({ error: "Invalid parameters" }, { status: 400 });
+    }
+
+    if (kind === "view") {
+      const cookieStore = await cookies();
+      const viewedCookie = cookieStore.get("orbit_viewed")?.value;
+      
+      let viewedListings: string[] = [];
+      if (viewedCookie) {
+        try {
+          viewedListings = JSON.parse(viewedCookie);
+        } catch {
+          // Ignore parsing errors
+        }
+      }
+
+      if (viewedListings.includes(listing_id)) {
+        // Silently succeed to prevent DB view-spamming
+        return Response.json({ success: true, message: "Already viewed" });
+      }
+
+      viewedListings.push(listing_id);
+      if (viewedListings.length > 50) {
+        viewedListings.shift(); // Keep only the most recent 50 viewed IDs
+      }
+
+      cookieStore.set("orbit_viewed", JSON.stringify(viewedListings), {
+        httpOnly: true,
+        maxAge: 60 * 60 * 24 * 7, // 1 week
+        path: "/",
+        sameSite: "lax",
+      });
     }
 
     const supabase = await createSupabaseServerClient();
