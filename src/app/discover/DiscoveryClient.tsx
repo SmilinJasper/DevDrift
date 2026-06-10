@@ -20,6 +20,7 @@ export function DiscoveryClient() {
   const sentinelRef = useInfiniteScroll(loadMore);
   
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+  const [isSavedIdsLoaded, setIsSavedIdsLoaded] = useState(false);
   const userId = useUser();
 
   useEffect(() => {
@@ -27,6 +28,7 @@ export function DiscoveryClient() {
     // Initial fetch of saved items
     getSavedListingIds(userId).then((ids) => {
       setSavedIds(new Set(ids));
+      setIsSavedIdsLoaded(true);
     });
   }, [userId]);
 
@@ -70,7 +72,7 @@ export function DiscoveryClient() {
         </div>
       )}
 
-      {isLoading ? (
+      {isLoading || !isSavedIdsLoaded ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {Array.from({ length: 6 }).map((_, i) => (
             <ListingCardSkeleton key={i} />
