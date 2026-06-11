@@ -1,18 +1,73 @@
 -- Seed Data for DevDrift
 
--- 1. Insert Mock Profile
-INSERT INTO public.profiles (id, username, full_name, bio, interests, location)
-VALUES (
+-- 1. Insert Mock User into auth.users (This triggers profile creation)
+INSERT INTO auth.users (
+    instance_id,
+    id,
+    aud,
+    role,
+    email,
+    encrypted_password,
+    email_confirmed_at,
+    recovery_sent_at,
+    last_sign_in_at,
+    raw_app_meta_data,
+    raw_user_meta_data,
+    created_at,
+    updated_at,
+    confirmation_token,
+    email_change,
+    email_change_token_new,
+    recovery_token
+) VALUES (
     '00000000-0000-0000-0000-000000000000',
-    'demo_user',
-    'Demo User',
-    'Just testing out DevDrift!',
-    ARRAY['react', 'nextjs', 'typescript', 'frontend'],
-    'San Francisco, CA'
-)
-ON CONFLICT (id) DO NOTHING;
+    '00000000-0000-0000-0000-000000000000',
+    'authenticated',
+    'authenticated',
+    'demo@devdrift.com',
+    '$2a$10$TKh8H1.PfQx37YgCzwiKb.KjNyWgaHb9cbcoQgdIVFlYg7B77UdFm',
+    now(),
+    now(),
+    now(),
+    '{"provider":"email","providers":["email"]}',
+    '{"username":"demo_user","full_name":"Demo User"}',
+    now(),
+    now(),
+    '',
+    '',
+    '',
+    ''
+) ON CONFLICT (id) DO NOTHING;
 
--- 2. Insert Mock Listings
+INSERT INTO auth.identities (
+    id,
+    user_id,
+    provider_id,
+    identity_data,
+    provider,
+    last_sign_in_at,
+    created_at,
+    updated_at
+) VALUES (
+    '00000000-0000-0000-0000-000000000000',
+    '00000000-0000-0000-0000-000000000000',
+    '00000000-0000-0000-0000-000000000000',
+    '{"sub":"00000000-0000-0000-0000-000000000000","email":"demo@devdrift.com"}'::jsonb,
+    'email',
+    now(),
+    now(),
+    now()
+) ON CONFLICT (provider_id, provider) DO NOTHING;
+
+-- 2. Update the auto-generated profile with extra metadata
+UPDATE public.profiles
+SET 
+    bio = 'Just testing out DevDrift!',
+    interests = ARRAY['react', 'nextjs', 'typescript', 'frontend'],
+    location = 'San Francisco, CA'
+WHERE id = '00000000-0000-0000-0000-000000000000';
+
+-- 3. Insert Mock Listings
 INSERT INTO public.listings (title, description, type, tags, location, is_remote, starts_at, ends_at, application_url, popularity_score, is_published, created_by)
 VALUES 
     (
