@@ -94,5 +94,26 @@ python scraper/main.py
 ### GitHub Actions
 The scraper is fully automated via GitHub Actions (`.github/workflows/scrape.yml`), running twice daily. Ensure `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are configured in your repository's GitHub Action Secrets.
 
+## 🧪 Testing
+
+DevDrift maintains a comprehensive, layer-decoupled automated testing suite to guarantee system stability across the frontend, data ingestion pipeline, and database constraints.
+
+### Frontend Testing (Jest & Playwright)
+- **Unit/Integration (Jest):** Run `npm run test` to execute React component tests (`src/__tests__/components`) and mocked Supabase hook validations.
+- **End-to-End (Playwright):** Run `npm run test:e2e` to simulate real user interactions in a headless browser. Playwright's `globalSetup` dynamically provisions an isolated test user (`e2e-tester@devdrift.com`) via the Supabase Admin API to bypass GoTrue rate limits and guarantee reliable auth flows.
+
+### Python Scraper Pipeline (Pytest)
+Run `$env:PYTHONPATH="."; pytest scraper/tests/` to execute deterministic tests for the data ingestion algorithms. 
+`pytest-mock` is used extensively to stub Apify Actor results, XML feeds, and Supabase client insertions—allowing us to test deduplication and metadata mapping offline without burning API credits or hitting the live database.
+
+### Database Integrity (pgTAP)
+We leverage [pgTAP](https://pgtap.org/) for native PostgreSQL unit testing inside ephemeral containers.
+Run `supabase test db` to automatically evaluate:
+- **Row Level Security (RLS):** Validates that interactions (e.g., bookmarks) are strictly isolated between isolated users (mocking JWT claim sets).
+- **Triggers:** Ensures auto-generation of `public.profiles` correctly mirrors `auth.users` insertions.
+- **RPC Signatures:** Confirms the `recommend_listings_for_user` pgvector embeddings search function is correctly instantiated.
+
+---
+
 ## 📄 License
 This project is open-source and available under the MIT License.
